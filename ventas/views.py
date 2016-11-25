@@ -9,9 +9,9 @@ from django.shortcuts import render_to_response
 from django.template.context_processors import csrf
 from django.utils.datetime_safe import datetime
 from django.views.generic.base import TemplateView, View
+from django.views.generic.dates import timezone_today
 from geraldo.generators.pdf import PDFGenerator
 
-from afip_ws.wsaa import obtener_o_crear_permiso
 from afip_ws.wsfev1 import WSFEv1
 from core import utils
 from ventas.forms import ArticulosForm, ClientesForm, RubrosForm, SubrubrosForm, LineasForm, CondicionesVentaForm, \
@@ -139,6 +139,7 @@ class ArticulosNuevo(CreateView):
     def form_valid(self, form):
         art = form.save(commit=False)
         art.modificado_por = self.request.user
+        art.ultima_actualizacion_precio = timezone_today()
         art.save()
         return HttpResponseRedirect(self.success_url)
 
