@@ -1,0 +1,27 @@
+/*FORMS*/
+.help-text {
+    margin-top: 30px;
+    margin-left: 10px;
+}
+
+.errorlist {
+    background-color: #FFCDD2;
+    color: #D50000;
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+
+.moneda_pesos:before {
+    content: '$ ';
+}
+
+.minimize_cell_content input {
+    /*padding: 0;*/
+
+}
+
+.minimize_cell_content div.mdl-textfield {
+    width: auto;
+}

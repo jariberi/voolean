@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static %}
+{% block pageTitle %}
+    ARTICULOS
+{% endblock %}
+
+{% block siteTitle %}
+    ARTICULOS
+{% endblock %}
+{
+
+{% block actionButtons %}
+    <button onclick='$("form").submit()' class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--accent"
+            type="submit"><i class="material-icons">send</i></button>
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-color--grey-400" onclick="history.back()"><i class="material-icons">clear</i></button>
+{% endblock %}
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+{% endblock %}
+
+{% block container %}
+    <form method="post" autocomplete="off" novalidate>{% csrf_token %}
+        {{ form.as_mdl }}
+        <div class="mdl-grid">
+            <div class="mdl-cell--5-col">
+                <div class="mdl-textfield mdl-js-textfield">
+                    <span><b>Precio de Venta        </b></span>
+                    <span id="precio_venta"></span>
+                    <script>
+                        function calcularPrecioVenta() {
+                            var precio_compra = parseFloat($('#id_costo_compra').val()) | 0;
+                            var descuento = parseFloat($('#id_descuento_compra').val()) | 0;
+                            var ganancia = parseFloat($('#id_ganancia_venta').val()) | 0;
+                            var precio_venta = (precio_compra - (precio_compra * descuento / 100)) * (1 + ganancia / 100);
+                            $('#precio_venta').text(precio_venta)
+                        }
+                        calcularPrecioVenta();
+
+                        $("form").on("change","#id_costo_compra, #id_descuento_compra, #id_ganancia_venta",function () {
+                            calcularPrecioVenta();
+                        });
+
+                    </script>
+                </div>
+            </div>
+        </div>
+    </form>
+    <script>
+        {#        PROVEEDOR_PRIMARIO#}
+        var options_proveedor_primario = {
+            url: function (phrase) {
+                return "{% url "get_proveedores_fk" %}" + "?ph=" + phrase;
+            },
+
+            getValue: "razon_social",
+
+            list: {
+                onChooseEvent: function () {
+                    var value = $("#id_proveedor_primario_0").getSelectedItemData().pk;
+                    $("#id_proveedor_primario_1").val(value).trigger("change");
+                }
+            }
+        };
+
+        $("#id_proveedor_primario_0").easyAutocomplete(options_proveedor_primario);
+        $("#id_proveedor_primario_0").on("change", function () {
+            if ($(this).val() == '') {
+                $("#id_proveedor_primario_1").val("").trigger("change");
+            }
+        });
+
+        {#        PROVEEDOR_SECUNDARIO#}
+        var options_proveedor_secundario = {
+            url: function (phrase) {
+                return "{% url "get_proveedores_fk" %}" + "?ph=" + phrase;
+            },
+
+            getValue: "razon_social",
+
+            list: {
+                onChooseEvent: function () {
+                    var value = $("#id_proveedor_secundario_0").getSelectedItemData().pk;
+                    $("#id_proveedor_secundario_1").val(value).trigger("change");
+                }
+            }
+        };
+
+        $("#id_proveedor_secundario_0").easyAutocomplete(options_proveedor_secundario);
+        $("#id_proveedor_secundario_0").on("change", function () {
+            if ($(this).val() == '') {
+                $("#id_proveedor_secundario_1").val("").trigger("change");
+            }
+        });
+        {#        LINEAS#}
+        var options_lineas = {
+            url: function (phrase) {
+                return "{% url "get_lineas_fk" %}" + "?ph=" + phrase;
+            },
+
+            getValue: "nombre",
+
+            list: {
+                onChooseEvent: function () {
+                    var value = $("#id_linea_0").getSelectedItemData().pk;
+                    $("#id_linea_1").val(value).trigger("change");
+                }
+            }
+        };
+
+        $("#id_linea_0").easyAutocomplete(options_lineas);
+        $("#id_linea_0").on("change", function () {
+            if ($(this).val() == '') {
+                $("#id_linea_1").val("").trigger("change");
+            }
+        });
+
+        {#        SUBRUBROS#}
+        var options_subrubros = {
+            url: function (phrase) {
+                return "{% url "get_subrubros_fk" %}" + "?ph=" + phrase;
+            },
+
+            getValue: "nombre",
+
+            list: {
+                onChooseEvent: function () {
+                    var value = $("#id_subrubro_0").getSelectedItemData().pk;
+                    $("#id_subrubro_1").val(value).trigger("change");
+                }
+            }
+        };
+
+        $("#id_subrubro_0").easyAutocomplete(options_subrubros);
+        $("#id_subrubro_0").on("change", function () {
+            if ($(this).val() == '') {
+                $("#id_subrubro_1").val("").trigger("change");
+            }
+        });
+        $.validate({
+            lang: 'es',
+        });
+    </script>
+{% endblock %}

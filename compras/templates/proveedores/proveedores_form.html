@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title_page %}
+    PROVEEDORES
+{% endblock %}
+
+{% block container %}
+    <form method="post" autocomplete="off" novalidate>{% csrf_token %}
+        {{ form.as_mdl }}
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col">
+                <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent"
+                        type="submit">Aceptar<i
+                        class="material-icons">send</i></button>
+                <input class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect" type="reset"
+                       value="Deshacer cambios"/>
+                <input class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect" type="button"
+                       value="Cancelar"
+                       onclick="history.back()">
+            </div>
+        </div>
+    </form>
+    <script>
+        $.validate({
+            lang: 'es',
+        });
+    </script>
+{% endblock %}

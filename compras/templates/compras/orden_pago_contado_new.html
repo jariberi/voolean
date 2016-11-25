@@ -1,0 +1,713 @@
+{% extends "base.html" %} 
+{% load staticfiles %}
+{% block headExtras %}
+<link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" />
+<link rel="stylesheet" href="{% static "css/spinner.css" %}" />
+<link rel="stylesheet" href="{% static "css/chosen.css" %}" type="text/css">
+<script src="{% static "js/chosen.jquery.js" %}" type="text/javascript"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
+<script src="{% static "js/jquery.spin.js" %}"></script>
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.2/css/bootstrapValidator.min.css"/>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.2/js/bootstrapValidator.min.js"></script>
+<script type="text/javascript" src="http://bootstrapvalidator.com/vendor/bootstrapvalidator/js/language/es_ES.js"></script>
+<link rel="stylesheet" href="{% static "css/bootstrap-chosen.css" %}" type="text/css">
+<script src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="//cdn.datatables.net/plug-ins/9dcbecd42ad/integration/bootstrap/3/dataTables.bootstrap.css" />
+<script src="//cdn.datatables.net/plug-ins/9dcbecd42ad/integration/bootstrap/3/dataTables.bootstrap.js"></script>
+<script>
+$(document).ready(function () {
+	var fila_valor=null;
+	var total_facturas;
+	var total_valores;
+	var total_entregas;
+	var html_spinner = '<div class="spinner">\
+		  				<div class="rect1"></div>\
+						<div class="rect2"></div>\
+						<div class="rect3"></div>\
+						<div class="rect4"></div>\
+						<div class="rect5"></div>\
+						</div>'
+	
+	function redondear(numero, decimales)
+	{
+		var flotante = parseFloat(numero);
+		var resultado = Math.round(flotante*Math.pow(10,decimales))/Math.pow(10,decimales);
+		return resultado.toFixed(decimales);
+	}
+	
+	function calcularTotalFacturas(){
+		total_facturas = 0;
+		$(".saldo_factura").each(function(){
+			total_facturas = total_facturas + parseFloat($(this).text().replace("$ ",""))
+		});
+		$("#total_facturas").text("$ "+redondear(total_facturas,2))
+	}
+	
+	function calcularEntregaFacturas(){
+		total_entregas = 0;
+		$(".entrega_factura").each(function(){
+			total_entregas = total_entregas + parseFloat($(this).val())
+		});
+		$("#total_entregas").text("$ "+redondear(total_entregas,2))
+	}
+	
+	function calcularTotalValores(){
+		console.log(parseFloat($("label#monto_a_credito").text()))
+		if ($("label#monto_a_credito").is(":visible") && parseFloat($("label#monto_a_credito").text())>0){
+			total_valores=parseFloat($("label#monto_a_credito").text());
+		} 
+		else {total_valores = 0;}
+		
+		$(".monto_input").each(function(){
+			if ($(this).val()){
+				total_valores = total_valores + parseFloat($(this).val());
+			} else {total_valores = total_valores + 0;}
+		});
+		$("#total_valores").text("Total: $ "+redondear(total_valores,2))
+	}
+	
+	//Funciones
+	function buscarNumOP(){
+		$.ajax({url:'/api/get_num_orden_pago/',
+                beforeSend: function () {
+						$("label#numero_orden_pago").text("Obteniendo datos...");
+                },
+                success:  function (response) {
+                        $("label#numero_orden_pago").text("Nro: "+("00000000" + response).slice (-8));
+                }
+        });
+    }
+    
+    // Code adapted from http://djangosnippets.org/snippets/1389/  
+    function updateElementIndex(el, prefix, ndx) {
+        var id_regex = new RegExp('(' + prefix + '-\\d+-)');
+        var replacement = prefix + '-' + ndx + '-';
+        if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex,
+        replacement));
+        if (el.id) el.id = el.id.replace(id_regex, replacement);
+        if (el.name) el.name = el.name.replace(id_regex, replacement);
+    }
+    
+    function adecuarFilaValor(el){
+    	//var regex = /valores-(\d+)-/g;
+    	//var num = regex.exec($(el).attr("id"));
+    	var valor = $("option:selected", el).val();
+    	if (valor=="CHP") {
+    		$(el).parents(".item").find(".seccion_cheque").show();
+    		$(el).parents(".item").find(".seccion_cheque_3").hide();
+    		$(el).parents(".item").find(".no_se_necesita").hide();
+    		$(el).parents(".item").find(".seccion_transferencia").hide();
+    		$(el).parents(".item").find(".monto_input").attr("readonly",false)
+    	}
+    	else if (valor=="CHT") {
+    		$(el).parents(".item").find(".seccion_cheque").hide();
+    		$(el).parents(".item").find(".seccion_cheque_3").show();
+    		$(el).parents(".item").find(".no_se_necesita").hide();
+    		$(el).parents(".item").find(".seccion_transferencia").hide();
+    		$(el).parents(".item").find(".monto_input").attr("readonly",true)
+    	}
+    	else if (valor=="TRB") {
+    		$(el).parents(".item").find(".seccion_cheque").hide();
+    		$(el).parents(".item").find(".seccion_cheque_3").hide();
+    		$(el).parents(".item").find(".no_se_necesita").hide();
+    		$(el).parents(".item").find(".seccion_transferencia").show();
+    		$(el).parents(".item").find(".monto_input").attr("readonly",false)
+    	}
+    	else if (valor=="EFE") {
+    		$(el).parents(".item").find(".seccion_cheque").hide();
+    		$(el).parents(".item").find(".seccion_cheque_3").hide();
+    		$(el).parents(".item").find(".no_se_necesita").show();
+    		$(el).parents(".item").find(".seccion_transferencia").hide();
+    		$(el).parents(".item").find(".monto_input").attr("readonly",false)
+    	}
+    }
+    
+    function borrarValor(btn, prefix) {
+        var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+        if (formCount > 1) {
+            // Borrar el valor 
+            $(btn).parents('.item').remove();
+            var forms = $('#detalle_valores .item'); // Obtengo todos los formularios  
+            // Actualizo el numero de valores (1 menos el anterior)
+            $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
+            var i = 0;
+            // Recorro los valores y seteo sus indices, id, etc
+            for (formCount = forms.length; i < formCount; i++) {
+                $(forms.get(i)).children().children().children().children().each(function () {
+                    updateElementIndex(this, prefix, i);
+                });
+                $(forms.get(i)).children().children().each(function () {
+                    updateElementIndex(this, prefix, i);
+                });
+            }
+        } // End if
+        else {
+            alert("El recibo debe contener al menos un valor");
+        }
+        return false;
+    }
+
+    function agregarValor(btn, prefix) {
+        var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val()); 
+        if (formCount < 20) {
+            // Clone a form (without event handlers) from the first form
+            var row = $("#detalle_valores .item:first").clone(false).get(0);
+            // Insert it after the last form
+            $(row).removeAttr('id').hide().insertAfter("#detalle_valores .item:last").slideDown(300);
+
+            // Remove the bits we don't want in the new row/form
+            // e.g. error messages
+            $(".errorlist", row).remove();
+            $(row).children().removeClass("error");
+            
+            // Relabel or rename all the relevant bits
+            $(row).children().children().children().children().each(function () {
+                updateElementIndex(this, prefix, formCount);
+                $(this).val("");
+                $(this).removeAttr('value');
+            });
+            $(row).children().children().each(function () {
+                updateElementIndex(this, prefix, formCount);
+                $(this).val("");
+                $(this).removeAttr('value');
+            });
+                                    
+            //Acomodo la fila a cheque
+            $(row).find(".tipo_valor_select").val("CHT");
+            adecuarFilaValor($(row).find(".tipo_valor_select"));
+            $(row).find(".seleccion_cheque").text("Haga click aca para seleccionar un cheque de terceros")
+                        
+            // Handler de evento de cambio de seleccion de tipo de valor
+    		$(row).find(".tipo_valor_select").change(function() {
+    			return adecuarFilaValor(this);
+    		});
+    		
+    		//Handler de Evento de borrado de valor
+    		$(row).find(".borrar").click(function () {
+       			return borrarValor(this, "valores");
+    		});
+    		
+    		//Handler de evento de calculo de total
+    		$(row).find(".monto_input").change(function() {
+    			return calcularTotalValores();
+    		});
+    		
+    		//Habilito validadores
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_numero_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_fecha_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_cobro_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_titular_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_cuit_titular_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_paguese_a_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".cheque_domicilio_pago_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".transferencia_banco_origen_select"));
+    		$("form").bootstrapValidator('addField', $(row).find(".transferencia_numero_operacion_input"));
+    		$("form").bootstrapValidator('addField', $(row).find(".transferencia_cuenta_destino_select"));
+    		$("form").bootstrapValidator('addField', $(row).find(".monto_input"));
+    
+            // Update the total form count
+            $("#id_" + prefix + "-TOTAL_FORMS").val(formCount + 1);
+        } // End if
+        else {
+            alert("Solo se puede agregar 20 valores por recibo");
+        }
+        return false;
+    }
+    
+    
+   
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////Ejecutables
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    buscarNumOP();
+    
+    $("input[type='text'], select").each(function() {
+		$(this).addClass("form-control");
+		});
+    
+    $(".seccion_transferencia").hide();
+    $(".seccion_cheque").hide();
+    
+    var pro= $("#id_proveedor").val();
+    $("input[name='proveedor'][type='hidden']").val(pro);
+    
+    $.get("/api/get_credito_valores_op/"+pro, function(data){
+		if (data) {
+			var json_val = JSON.parse(data);
+			if (json_val) {
+				var html = 'Monto credito: <label id="monto_a_credito">'+json_val.pendiente+'</label>';
+				$("#a_credito").html(html).show();
+				calcularTotalValores();
+				$("#id_credito_anterior").val(json_val.pendiente)
+			}
+		}
+		else {$("#a_credito").hide();$("#id_credito_anterior").val("0.00")}
+	});
+    
+    
+    
+    // Evento de cambio de seleccion de tipo de valor
+    $(".tipo_valor_select").change(function() {
+    	return adecuarFilaValor(this);
+    });
+    
+    $("body").on('change','.pago_input',function(){
+    	calcularEntregaFacturas();
+    });
+    
+    $(".monto_input").change(function() {
+    	return calcularTotalValores();
+    });
+    
+	// Register the click event handlers
+    $("#agregar_valor").click(function () {
+        return agregarValor(this, "valores");
+    });
+
+    $(".borrar").click(function () {
+        return borrarValor(this, "valores");
+    });
+    
+    $('form').keypress(function(e){   
+    	if(e == 13){
+      		return false;
+    	}
+  	});
+
+  	$('input').keypress(function(e){
+    	if(e.which == 13){
+      		return false;
+    	}
+  	});
+  	
+  	$("table#detalle_valores").on("click",".seleccion_cheque",function(){
+  	    	console.log($(this).parents(".item"))
+  	      	fila_valor=$(this).parents(".item")
+  	      	$("#modalSeleccionCheque3").modal({backdrop:'static'});
+  	      	return false;
+  	})
+  	
+  	$("#seleccionarChequeBtn").on("click",function(){
+  		var che = tabla_cheques.row('.selected').data();
+  		console.log(che[6])
+  		console.log(fila_valor)
+  		fila_valor.find(".id_cheque_tercero_hidden").val(che[6])
+  		fila_valor.find(".seleccion_cheque").text("Cheque nro° "+che[2]+" de "+che[4]+" a cobrar el "+che[3])
+  		fila_valor.find(".monto_input").val(che[5])
+  		fila_valor=null
+  		tabla_cheques.clear().draw()
+  		calcularTotalValores();
+  	})
+  	////////////////////////////
+  	///////EJECUTABLES////////
+  	////////////////////////////////
+  	var tabla_cheques=$('#cheques').DataTable( {
+  		"lengthMenu": [[6], [6]],
+  		"orderMulti": false,
+		"order": [ 1, 'desc' ],
+    	"columns": [
+    	            {
+    	                "className":          'details-control',
+    	                "orderable":      false,
+    	                "data":           null,
+    	                "defaultContent": '<span class="glyphicon glyphicon-eye-open"></span>',
+    	                "searchable":	  false,
+    	            },
+    	            null,
+    	            {"orderable":      false,},
+    	            null,
+    	            {"orderable":      false,},
+    	            {"orderable":      false,},
+    	            {"visible": false,},
+    	        ],		
+    	"language": {
+                "url": "//cdn.datatables.net/plug-ins/725b2a2115b/i18n/Spanish.json"
+        			},
+        				"processing": true,
+        				"serverSide": true,
+        				"ajax": {
+        					"url": "{% url "cheques_datatables" %}",
+        					"data": function ( d ) {
+        		                d.tipo = "cartera"
+        		            }
+        				},
+        				"initComplete": function(settings, json) {
+        				    $("#cheques thead tr th:first").removeClass("glyphicon glyphicon-eye-open");
+        				    $("#cheques tfoot tr th:first").removeClass("glyphicon glyphicon-eye-open");
+        				  }
+    
+	} );
+    
+    $('#cheques tbody').on('click', 'td.details-control', function () {
+        var tr = $(this).closest('tr');
+        var row = tabla_cheques.row( tr );
+ 
+        if ( row.child.isShown() ) {
+            // This row is already open - close it
+            row.child.hide();
+            $(this).html('<span class="glyphicon glyphicon-eye-open"></span>');
+        }
+        else {
+            // Open this row
+            row.child(row.data()[0]).show();
+            $(this).html('<span class="glyphicon glyphicon-eye-close"></span>');
+        }
+    } );
+    
+    $('#cheques tbody').on( 'click', 'tr', function () {
+        if ( $(this).hasClass('selected') ) {
+            $(this).removeClass('selected');
+        }
+        else {
+            tabla_cheques.$('tr.selected').removeClass('selected');
+            $(this).addClass('selected');
+        }
+    } );
+  	
+  	$("#id_proveedor").chosen();
+  	
+  	$(".monto_input").attr("readonly",true)
+  	
+	$("form").bootstrapValidator({
+		container:'popover',
+		feedbackIcons: {
+			valid: 'glyphicon glyphicon-ok',
+			invalid: 'glyphicon glyphicon-remove',
+			validating: 'glyphicon glyphicon-refresh'
+		},
+		live:'submitted',
+		})
+		.on('success.form.bv',function(e){
+			console.log("Success validation")
+			e.preventDefault();
+			var $form = $(e.target)
+			var total_entrega=parseFloat($form.find("#total_entregas").text().replace('$ ',''))
+			var total_valores=parseFloat($form.find("#total_valores").text().replace('Total: $ ',''))
+			console.log(total_entrega, total_valores)
+			if (total_entrega>total_valores){
+				console.log("valores menor que entrega")
+				$("#modalErrorTotales").modal({backdrop:'static'})}
+			else if (total_entrega < total_valores){
+				console.log("valores menor que entrega")
+				$("#modalVueltoOCredito").modal({backdrop:'static'})
+				}
+			else {
+				$.post($form.attr('action'), $form.serialize(), function(data){
+					console.log(data)
+					var json_val = JSON.parse(data)
+					window.open('/pagos/impr_op/'+json_val.id,'_blank')
+					window.location.replace({% url "nuevaCompra" %})
+				})
+				}
+			
+		})
+		//$("form").submit()
+		
+		$("#clickSubmitForm").on('click',function(){
+			console.log("debe hacer submit")
+			$form = $("form")
+			$.post($form.attr('action'), $form.serialize(), function(data){
+				console.log(data)
+				var json_val = JSON.parse(data)
+				window.open('/pagos/impr_op/'+json_val.id,'_blank')
+				window.location.replace({% url "nuevaCompra" %})
+		})
+		})
+			
+
+});</script>
+<style type="text/css">
+
+table.dataTable tbody tr.selected {
+	  background-color: #b0bed9;
+	}
+/*Spinner de carga*/
+.spinner {
+	  margin: 100px auto;
+	  width: 50px;
+	  height: 30px;
+	  text-align: center;
+	  font-size: 10px;
+	}
+
+	.spinner > div {
+	  background-color: #333;
+	  height: 100%;
+	  width: 6px;
+	  display: inline-block;
+	  
+	  -webkit-animation: stretchdelay 1.2s infinite ease-in-out;
+	  animation: stretchdelay 1.2s infinite ease-in-out;
+	}
+
+	.spinner .rect2 {
+	  -webkit-animation-delay: -1.1s;
+	  animation-delay: -1.1s;
+	}
+
+	.spinner .rect3 {
+	  -webkit-animation-delay: -1.0s;
+	  animation-delay: -1.0s;
+	}
+
+	.spinner .rect4 {
+	  -webkit-animation-delay: -0.9s;
+	  animation-delay: -0.9s;
+	}
+
+	.spinner .rect5 {
+	  -webkit-animation-delay: -0.8s;
+	  animation-delay: -0.8s;
+	}
+
+	@-webkit-keyframes stretchdelay {
+	  0%, 40%, 100% { -webkit-transform: scaleY(0.4) }  
+	  20% { -webkit-transform: scaleY(1.0) }
+	}
+
+	@keyframes stretchdelay {
+	  0%, 40%, 100% { 
+	    transform: scaleY(0.4);
+	    -webkit-transform: scaleY(0.4);
+	  }  20% { 
+	    transform: scaleY(1.0);
+	    -webkit-transform: scaleY(1.0);
+	  }
+	}
+/*Fin de spinner de carga*/
+
+
+form .chosen-choices {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    min-height: 34px;
+    padding: 6px 12px;
+}
+form .form-control-feedback {
+    /* To make the feedback icon visible */
+    z-index: 100;
+}
+
+
+#cont {  
+  /*width: 1100px;*/  
+  margin-left: auto;  
+  margin-right: auto;
+}
+
+.seccion_cheque_3{
+	padding-top: 35px;
+}
+
+
+</style>{% endblock %} 
+{% block container %}
+    <!--Modal Error importe valores menor importe facturas!-->
+    <div id="modalErrorTotales" class="modal fade">
+    	<div class="modal-dialog">
+    		<div class="modal-content">
+        		<div class="modal-header">
+        			<button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Cerrar</span></button>
+        			<h4 class="modal-title">Error</h4>
+        </div>
+        <div class="modal-body">
+          <p>El total entregado supera al total de los valores. Verifique los datos ingresados.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cerrar</button>
+        </div>
+      </div><!-- /.modal-content -->
+    </div><!-- /.modal-dialog -->
+  </div><!-- /.modal -->
+  <!--Modal Tabla seleccion cheque de terceros!-->
+  <div id="modalSeleccionCheque3" class="modal fade">
+  	<div class="modal-dialog  modal-lg">
+  		<div class="modal-content">
+      		<div class="modal-header">
+      			<button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Cerrar</span></button>
+      			<h4 class="modal-title">Seleccione un cheque</h4>
+      </div>
+      <div class="modal-body">
+      <table id="cheques" class="table table-condensed" cellspacing="0" width="100%">
+  	<thead><tr>
+  		<th></th>
+  		<th>Fecha Librado</th>
+  		<th>Nro Cheque</th>
+  		<th>Fecha cobro</th>
+  		<th>Titular</th>
+  		<th>Monto</th>
+  	</tr></thead>
+  	
+  	<tfoot><tr>
+  		<th></th>
+  		<th>Fecha Librado</th>
+  		<th>Nro Cheque</th>
+  		<th>Fecha cobro</th>
+  		<th>Titular</th>
+  		<th>Monto</th>
+  	</tr></tfoot>
+  </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+        <button id="seleccionarChequeBtn" type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+    <div id="cont" class="container">
+      <div class="page_header"><h1>Pagos  <small>Nueva orden de pago</small></h1></div>
+      	<form class="form-horizontal" method="POST">{% csrf_token %}
+      			<!--Modal Error importe valores menor importe facturas!-->
+        <div id="modalVueltoOCredito" class="modal fade">
+        	<div class="modal-dialog">
+        		<div class="modal-content">
+            		<div class="modal-header">
+            			<button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Cerrar</span></button>
+            			<h4 class="modal-title">Que desea hacer?</h4>
+            </div>
+            <div class="modal-body">
+              <p>El/los valor/es entregado/s supera/n el total de comprobantes, que desea hacer?</p>
+              <div class="btn-group" data-toggle="buttons">
+              {% for radio in ordenPagoForm.que_hago_con_diferencia %}
+              {% if forloop.first %}<label for="{{radio.id_for_label}}" class="btn btn-primary active">
+              {% else %}<label for="{{radio.id_for_label}}" class="btn btn-primary">{% endif %}
+                {{radio.tag}} {{radio.choice_label}}
+                </label>
+              {% endfor %}
+            </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+              <button id="clickSubmitForm" type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+            </div>
+          </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+      </div><!-- /.modal -->
+      		<div class="panel panel-primary">
+      			<div class="panel-heading"><h3 class="panel-title">Cabecera</h3></div>
+      			<div class="panel-body">
+      				<div class="form-group">
+      					<label class="col-md-1 control-label" for="id_fecha">Fecha:</label>
+      					<div class="col-md-2">{{ ordenPagoForm.fecha }} </div>
+      					<label id="numero_orden_pago" class="col-md-2 control-label">Nro: ________</label>
+      				</div>
+      				<div class="form-group">
+      					<label class="col-md-1 control-label" for="id_proveedor">Proveedor:</label>
+      					<div class="col-md-5"><input name="proveedor" type="hidden"></input>{{ ordenPagoForm.proveedor }} </div>
+      				</div>
+      			</div>
+      		</div>
+      		<section class="panel panel-primary" id="seccion_comprobantes">
+  			<div class="panel-heading"><h3 class="panel-title">Comprobantes</h3></div>
+  			<div class="panel-body">
+  				{{ pagoFormset.management_form }}
+  				<div class="form-group">
+  					<table class="table table-condensed" id="detalle_comprobantes">
+  					<thead>
+    				<tr id="encabezado_detalle_comprobantes">
+    					<th>Fecha</th>
+    					<th>Comprobante N°</th>
+    					<th>Total</th>
+    					<th>Saldo</th>
+    					<th>Entrega</th>
+    				</tr></thead>
+    			<tbody>
+    				{% load l10n %}
+    				{% for formu in pagoFormset.forms %}
+    				<tr class="item">
+    					{{ formu.id_factura_compra }}
+    					<td><label class="fecha_factura" id="id_pagos-0-fecha">{{compra.fecha|date:"d/m/Y"}}</label></td>
+    					<td><label class="numero_factura" id="id_pagos-0-nro_factura">{{compra.identificador_completo}}</label></td>
+    					<td><label class="total_factura" id="id_pagos-0-total">{{compra.total|unlocalize}}</label></td>
+    					<td><label class="saldo_factura" id="id_pagos-0-saldo">{{compra.total|unlocalize}}</label></td>
+    					<td><label class="entrega_factura">{{compra.total|unlocalize}}</label></td>
+    				</tr>
+    				{% endfor %}
+    			</tbody>
+    			<tfoot><tr>
+    				<th></th>
+    				<th></th>
+    				<th></th>
+    				<th><label id="total_facturas">{{compra.total|unlocalize}}</label></th>
+    				<th><label id="total_entregas">{{compra.total|unlocalize}}</label></th>
+    			</tr></tfoot>
+    			</table>
+    			</div></div>
+    </section>
+    <section class="panel panel-primary" id="seccion_comprobantes">
+		<div class="panel-heading"><h3 class="panel-title">Valores</h3></div>
+		<div class="panel-body">
+			<div class="bg-info" id="a_credito"></div>
+			{{ valoresFormset.management_form }}
+			<table id="detalle_valores" class="table table-condensed">
+				<tbody>
+					<div class="form-group">	
+					{% for formu in valoresFormset.forms %}
+						<tr class="item">
+							<td>
+								<div class="row">
+									<div class="col-md-3">
+										<label for="id_valores-0-tipo" class="control-label">Tipo de valor:</label>
+										{{formu.tipo}}
+									</div>
+									<div class="col-md-2 seccion_cheque">
+										<label for="id_valores-0-cheque_numero" class="control-label">Numero Cheque:</label>
+										{{formu.cheque_numero}}
+									</div>
+									<div class="col-md-3 seccion_cheque">
+										<label for="id_valores-0-cheque_paguese_a" class="control-label">Paguese a</label>
+										{{formu.cheque_paguese_a}}
+									</div>
+									<div class="col-md-2 seccion_cheque">
+										<!--Div en blanco para que quede tipo tabla-->
+									</div>
+									<div class="col-md-3 seccion_transferencia">
+										<label for="id_valores-0-transferencia_cuenta_origen" class="control-label">Cuenta Origen:</label>
+										{{formu.transferencia_cuenta_origen}}
+									</div>
+									<div class="col-md-4 seccion_transferencia">
+										<!--Div en blanco para que quede tipo tabla-->
+									</div>
+									<div class="col-md-7 seccion_cheque_3">
+										{{formu.id_cheque_tercero}}
+										<label class="seleccion_cheque">Haga click aca para seleccionar un cheque de terceros</label>
+									</div>
+									<div class="col-md-2">
+										<label for="id_valores-0-monto" class="control-label">Monto:</label>
+										{{formu.monto}}
+									</div>
+								</div>
+								<div class="row">
+									<div class="col-md-3 col-md-offset-3 seccion_cheque">
+										<label for="id_valores-0-cheque_fecha" class="control-label">Fecha Cheque</label>
+										{{formu.cheque_fecha}}
+									</div>
+									<div class="col-md-3 seccion_cheque">
+										<label for="id_valores-0-cheque_fecha_cobro" class="control-label">Fecha Cobro Cheque</label>
+										{{formu.cheque_cobro}}
+									</div>
+									<div class="col-md-3 col-md-offset-3 seccion_transferencia">
+										<label for="id_valores-0-transferencia_numero_operacion" class="control-label">Número de operación</label>
+										{{formu.transferencia_numero_operacion}}
+									</div>
+									<div class="col-md-4 seccion_transferencia">
+										<label for="id_valores-0-transferencia_cuenta_destino" class="control-label">Cuenta Origen:</label>
+										{{formu.transferencia_cuenta_destino}}
+									</div>
+								</div>
+							</td>
+						<tr>
+				    {% endfor %}
+				    </div>
+  </tbody>
+</table>
+</div>
+<p><a id="agregar_valor" class="btn btn-primary" href="#">Agregar valor</a></p>
+<h4 id="total_valores">Total: $ 0.00</h4>
+
+</section>
+        <input class="btn btn-primary" value="GRABAR" type="submit">
+        </form>
+    </div>
+    {% endblock %}

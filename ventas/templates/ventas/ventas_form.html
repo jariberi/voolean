@@ -1,0 +1,1197 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+    <link rel="stylesheet" href="https://getmdl.io/material.min.css">
+    <script src="{% static "js/app.js" %}"></script>
+    <link rel="stylesheet" href="{% static "ventas_form.css" %}">
+{% endblock %}
+{% block pageTitle %}
+    VENTAS
+{% endblock %}
+
+{% block actionButtons %}
+    <a onclick="history.back()"
+       class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+        <i class="material-icons">clear</i>
+    </a>
+    {% if usa_factura_electronica %}
+        <a onclick="grabar_comprobante(false);"
+           class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+            <i class="material-icons">done</i>
+        </a>
+        <a onclick="grabar_comprobante(true);"
+           class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+            <i class="material-icons">done_all</i>
+        </a>
+        <dialog class="mdl-dialog" style="width: 550px;">
+            <h4 id="result" class="mdl-dialog__title"></h4>
+            <div class="mdl-dialog__content">
+                <p id="data"></p>
+                <p id="obs"></p>
+            </div>
+            <div class="mdl-dialog__actions">
+                <button type="button" class="mdl-button close">Cerrar</button>
+            </div>
+        </dialog>
+        <script !src="">
+            function grabar_comprobante(aprobar) {
+                var form = $("form");
+                var json = null;
+                $.post(form.attr('action'), form.serialize(), function (data_grabar) {
+                    json = data_grabar;
+                    if (aprobar) {
+                        var dialog = document.querySelector('dialog');
+                            if (!dialog.showModal) {
+                                dialogPolyfill.registerDialog(dialog);
+                            }
+                            dialog.showModal();
+                        dialog.querySelector('.close').addEventListener('click', function () {
+                                dialog.close();
+                                window.location.replace(json.redirect);
+                            });
+                        $.getJSON("ventas/aprobar/"+json.pk, function (data_aprobar) {
+                            if (data_aprobar.result == 'OK') {
+                                $("dialog #result").text('Comprobante aprobado');
+                                $("dialog #data").html('CAE:' + data_aprobar.cae + '<br>Vencimiento:' + data_aprobar.venc);
+                                $("dialog #obs").html(data_aprobar.obs);
+                            }
+                            else if (data_aprobar.result == 'ER') {
+                                $("dialog #result").text('Comprobante rechazada');
+                                $("dialog #data").text('ERROR:' + data_aprobar.err);
+                                $("dialog #obs").html(data_aprobar.obs);
+                            }
+                        });
+                    }
+                    else {
+                        window.location.replace(json.redirect);
+                    }
+                });
+
+
+            }
+        </script>
+    {% else %}
+        <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored"
+                type="submit" form="formVentas"><i class="material-icons">done</i>
+        </button>
+    {% endif %}
+{% endblock %}
+
+
+{% block container %}
+    <form id="formVentas" method="post" autocomplete="off" novalidate>{% csrf_token %}
+        <dialog style="width: 50%;" class="mdl-dialog">
+            <h4 class="mdl-dialog__title">Articulo Compuesto</h4>
+            <div class="mdl-dialog__content">
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            <input class="mdl-textfield__input" type="text" id="descripcion-articulo-compuesto">
+                            <label class="mdl-textfield__label" for="sample1">Descripción......</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <table id="tabla-compuesto" class="mdl-data-table mdl-js-data-table mdl-shadow-2dp">
+                            <thead>
+                            <tr>
+                                <th>Personalizar</th>
+                                <th>Cantidad</th>
+                                <th>Descripción</th>
+                                <th>Precio Unitario</th>
+                                <th>Total</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for i, formset_compuesto in formsets_compuestos.items %}
+                                {% for compuesto in formset_compuesto.forms %}
+                                    <tr class="compuesto" data-detalle="{{ i }}">
+                                        <td>{{ compuesto.pers }}</td>
+                                        <td>{{ compuesto.cantidad }}{{ compuesto.cantidad.errors }}</td>
+                                        <td>
+                                            {{ compuesto.articulo_almacenado }}{{ compuesto.articulo_almacenado.errors }}
+                                            {{ compuesto.descripcion }}{{ compuesto.descripcion.erros }}
+                                        </td>
+                                        <td>{{ compuesto.precio_unitario }}{{ compuesto.precio_unitario.errors }}</td>
+                                        <td><label class="total">0.00</label></td>
+                                    </tr>
+                                {% endfor %}
+
+                            {% endfor %}
+
+                            <tr id="compuesto-empty" style="display: none;" data-detalle="-1">
+                                <td>{{ formsets_compuestos.0.empty_form.pers }}</td>
+                                <td>{{ formsets_compuestos.0.empty_form.cantidad }}</td>
+                                <td>{{ formsets_compuestos.0.empty_form.articulo_almacenado }}
+                                    {{ formsets_compuestos.0.empty_form.descripcion }}</td>
+                                <td>{{ formsets_compuestos.0.empty_form.precio_unitario }}</td>
+                                <td><label class="total">0.00</label></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--1-col">
+                        <button data-detalle="-1" type="button" id="add_item_compuesto" class="btn teal darken-1"><i
+                                class="material-icons">add</i>
+                        </button>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell">
+                        <h5 id="total-compuesto">0.00</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="mdl-dialog__actions">
+                <button type="button" class="mdl-button close">Aceptar</button>
+            </div>
+        </dialog>
+        <div class="mdl-grid"></div>
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col">
+                <h4>Cabecera</h4>
+            </div>
+        </div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cell--8-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ ventaForm.cliente }}
+                            {{ ventaForm.cliente.label_tag }}
+                            <script>
+                                var options = {
+                                    url: function (phrase) {
+                                        return "{% url "get_clientes_fk" %}" + "?ph=" + phrase;
+                                    },
+
+                                    getValue: "razon_social",
+
+                                    list: {
+                                        onChooseEvent: function () {
+                                            var value = $("#id_cliente_0").getSelectedItemData().pk;
+                                            $("#id_cliente_1").val(value).trigger("change");
+                                        }
+                                    }
+                                };
+
+                                $("#id_cliente_0").easyAutocomplete(options);
+                                $("#id_cliente_0").on("change", function () {
+                                    if ($(this).val() == '') {
+                                        $("#id_cliente_1").val("").trigger("change");
+                                    }
+                                });
+                            </script>
+                        </div>
+                        {{ ventaForm.cliente.errors }}
+                    </div>
+                    <div class="mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ ventaForm.tipoDisplay }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ ventaForm.fecha }}
+                            {{ ventaForm.fecha.errors }}
+                        </div>
+                    </div>
+                    <div class="mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ ventaForm.condicion_venta }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mdl-cell--4-col">
+                <div class="mdl-textfield mdl-js-textfield">
+                    <h5 id="info_comprobante">--------------</h5>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col">
+                <h4>Detalle</h4>
+            </div>
+        </div>
+        {{ detalleFormset.management_form }}
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col">
+                <table id="detalle_factura" width="100%"
+                       class="mdl-data-table mdl-js-data-table mdl-shadow--2dp highlight">
+                    <thead>
+                    <tr id="encabezado_detalle_factura">
+                        <th style="width: 30px;">Tipo</th>
+                        <th style="width: 70px;">Cantidad</th>
+                        <th>Descripción</th>
+                        <th style="width: 70px;">Precio Unitario</th>
+                        <th style="width: 70px;">Descuento</th>
+                        <th style="width: 150px;">Total Articulo</th>
+                        <th style="width: 30px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for detalle in detalleFormset.forms %}
+                        <tr class="item" data-alic="IVA21">
+                            <td class="columna_tipo_articulo">
+                                {{ detalle.tipo }}
+                                <span id="id_detalle-0-chip_tipo" class="mdl-chip mdl-color--blue-300">
+                                            <span class="mdl-chip__text">AA</span>
+                                            </span>
+                                <ul class="mdl-menu mdl-js-menu" for="id_detalle-0-chip_tipo">
+                                    <li onclick="preAdecuarItem($(this).parents('.item'),'AA');"
+                                        class="mdl-menu__item">Almacenado
+                                    </li>
+                                    <li onclick="preAdecuarItem($(this).parents('.item'),'AP');"
+                                        class="mdl-menu__item">Personalizado
+                                    </li>
+                                    <li onclick="preAdecuarItem($(this).parents('.item'),'AC');"
+                                        class="mdl-menu__item">Compuesto
+                                    </li>
+                                </ul>
+                            </td>
+                            <td class="columna_cantidad">
+                                {{ detalle.cantidad }}
+                                {{ detalle.cantidad.errors }}
+                            </td>
+                            <td class="columna_descripcion">
+                                {{ detalle.articulo_almacenado }}
+                                {{ detalle.articulo_almacenado.errors }}
+                                {{ detalle.descripcion }}
+                                {{ detalle.linea }}
+                                {{ detalle.iva }}
+                                {{ detalle.descripcion.errors }}
+                                <script>
+                                    var options = {
+                                        url: function (phrase) {
+                                            if (es_b) {
+                                                return "{% url "get_articulos_fk" %}" + "?ph=" + phrase + "&iva_inc";
+                                            }
+                                            else {
+                                                return "{% url "get_articulos_fk" %}" + "?ph=" + phrase;
+                                            }
+                                        },
+
+                                        getValue: "articulo",
+
+                                        template: {
+                                            type: "custom",
+                                            method: function (value, item) {
+                                                return '<span style="float:left;">' + item.articulo + '</span>' + '$  ' + item.precio;
+                                            }
+                                        },
+
+                                        list: {
+                                            onChooseEvent: function () {
+                                                var value = $("#id_detalle-0-articulo_almacenado_0").getSelectedItemData().pk;
+                                                var precio = $("#id_detalle-0-articulo_almacenado_0").getSelectedItemData().precio;
+                                                var alic = $("#id_detalle-0-articulo_almacenado_0").getSelectedItemData().iva;
+                                                $("#id_detalle-0-articulo_almacenado_1").val(value).trigger("change");
+                                                $("#id_detalle-0-precio_unitario").val(precio).trigger("change");
+                                                $("#id_detalle-0-articulo_almacenado_0").parents(".item").attr('data-alic', alic);
+                                            }
+                                        }
+                                    };
+
+                                    $("#id_detalle-0-articulo_almacenado_0").easyAutocomplete(options);
+                                    $("#id_detalle-0-articulo_almacenado_0").on("change", function () {
+                                        if ($(this).val() == '') {
+                                            $("#id_detalle-0-articulo_almacenado_1").val("").trigger("change");
+                                        }
+                                    });
+                                </script>
+                            </td>
+                            <td class="columna_precio">
+                                {{ detalle.precio_unitario }}
+                                {{ detalle.precio_unitario.errors }}
+                            </td>
+                            <td class="columna_descuento">
+                                {{ detalle.descuento }}
+                                {{ detalle.descuento.errors }}
+                            </td>
+                            <td class="columna_total"><label class="total">$ 0.00</label></td>
+                            <td>
+                                <button type="button" class="delete btn red darken-2"><i
+                                        class="material-icons">remove</i>
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    <tr id="detalle_empty" data-alic="IVA21" style="display: none">
+                        <td class="columna_tipo_articulo">
+                            {{ detalleFormset.empty_form.tipo }}
+                            <span id="id_detalle-__prefix__-chip_tipo" class="mdl-chip mdl-color--blue-300">
+                                            <span class="mdl-chip__text">AA</span>
+                                            </span>
+                            <ul class="mdl-menu" for="id_detalle-__prefix__-chip_tipo">
+                                <li onclick="preAdecuarItem($(this).parents('.item'),'AA');"
+                                    class="mdl-menu__item">Almacenado
+                                </li>
+                                <li onclick="preAdecuarItem($(this).parents('.item'),'AP');"
+                                    class="mdl-menu__item">Personalizado
+                                </li>
+                                <li onclick="preAdecuarItem($(this).parents('.item'),'AC');"
+                                    class="mdl-menu__item">Compuesto
+                                </li>
+                            </ul>
+                        </td>
+                        <td class="columna_cantidad">{{ detalleFormset.empty_form.cantidad }}</td>
+                        <td class="columna_descripcion">
+                            {{ detalleFormset.empty_form.articulo_almacenado }}
+                            {{ detalleFormset.empty_form.descripcion }}
+                            {{ detalleFormset.empty_form.linea }}
+                            {{ detalleFormset.empty_form.iva }}
+                        </td>
+                        <td class="columna_precio">{{ detalleFormset.empty_form.precio_unitario }}</td>
+                        <td class="columna_descuento">{{ detalleFormset.empty_form.descuento }}</td>
+                        <td class="columna_total"><label class="total">$ 0.00</label></td>
+                        <td>
+                            <button type="button" class="delete btn red darken-2"><i
+                                    class="material-icons">remove</i>
+                            </button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="mdl-grid">
+            <div class="mdl-cell--1-col">
+                <button type="button" id="add_item_factura" class="btn teal darken-1"><i class="material-icons">add</i>
+                </button>
+            </div>
+        </div>
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col"></div>
+        </div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cell--1-col"><p class="mdl-textfield mdl-js-textfield">Subtotal</p></div>
+            <div class="mdl-cell--1-col"><p id="importe_subtotal" class="mdl-textfield mdl-js-textfield">0.00</p></div>
+            <div class="mdl-cell--1-col">
+                <div class="mdl-textfield mdl-js-textfield">
+                    {{ ventaForm.descuento }}
+                    {{ ventaForm.descuento.label_tag }}
+                    {{ ventaForm.descuento.errors }}
+                </div>
+            </div>
+            <div class="mdl-cell--1-col"><p class="mdl-textfield mdl-js-textfield">Neto</p></div>
+            <div class="mdl-cell--1-col"><p id="importe_neto" class="mdl-textfield mdl-js-textfield">0.00</p></div>
+            <div class="mdl-cell--1-col"><p class="mdl-textfield mdl-js-textfield">IVA</p></div>
+            <div class="mdl-cell--1-col"><p id="importe_iva" class="mdl-textfield mdl-js-textfield">0.00</p></div>
+            <div class="mdl-cell--1-col"><strong><p class="mdl-textfield mdl-js-textfield">TOTAL</p></strong></div>
+            <div class="mdl-cell--1-col"><strong><p id="importe_total" class="mdl-textfield mdl-js-textfield">0.00</p>
+            </strong></div>
+        </div>
+    </form>
+    <script>
+        var letra;
+        var subtotal_factura = 0;
+        var es_b = false;
+        var comp_dialog = document.querySelector("dialog");
+
+        function preAdecuarItem(item_cambia, valor) {
+            var b = confirm('Al cambiar el tipo de artículo, se perderán los cambios. ¿Desea continuar?');
+            if (b) {
+                if (valor == 'AA' | valor == 'AP') {//Significa que viene de un AC
+                    //Elimino todos los compuestos relacionados a este item
+                    //Numero de detalle, 0-indexed
+                    var regex = /detalle-(\d+)-/;
+                    var n_item = regex.exec($(item_cambia).find(".detalle-tipo").attr("id"))[1];
+                    $('dialog table tbody tr[data-detalle="' + n_item + '"]').remove();
+                    $('dialog input[name*="compuesto-' + n_item + '-TOT"]').remove();
+                    $('dialog input[name*="compuesto-' + n_item + '-MAX"]').remove();
+                    $('dialog input[name*="compuesto-' + n_item + '-INI"]').remove();
+                    $('dialog input[name*="compuesto-' + n_item + '-MIN"]').remove();
+                }
+                $(item_cambia).find('.detalle-tipo').val(valor).trigger('change');
+            }
+        }
+
+        function adecuarItem(item_cambiado) {
+            var articulo_almacenado = $(item_cambiado).find(".detalle-articulo_almacenado");
+            var descripcion = $(item_cambiado).find(".detalle-descripcion");
+            var linea = $(item_cambiado).find(".detalle-linea");
+            var iva = $(item_cambiado).find(".detalle-articulo_almacenado");
+            var precio_unitario = $(item_cambiado).find(".detalle-precio_unitario");
+            var descuento = $(item_cambiado).find(".detalle-descuento");
+            //Art. almacenado
+            if ($(item_cambiado).find(".detalle-tipo").val() == 'AA') {
+                $(item_cambiado).find("span.mdl-chip").removeClass('mdl-color--green-300 mdl-color--orange-300').addClass('mdl-color--blue-300');
+                $(item_cambiado).find("span.mdl-chip span").text('AA');
+                $(item_cambiado).find(".detalle-articulo_almacenado").show();
+                $(item_cambiado).find(".detalle-descripcion").val("").hide().off('click');
+                $(item_cambiado).find(".detalle-linea").hide();
+                $(item_cambiado).find(".detalle-iva").hide();
+                $(item_cambiado).find(".detalle-precio_unitario").val("").attr("readonly", true);
+            }
+            //Art. Personalizado
+            else if ($(item_cambiado).find(".detalle-tipo").val() == 'AP') {
+                $(item_cambiado).find("span.mdl-chip").removeClass('mdl-color--blue-300 mdl-color--orange-300').addClass('mdl-color--green-300');
+                $(item_cambiado).find("span.mdl-chip span").text('AP');
+                $(item_cambiado).find(".detalle-articulo_almacenado").val("").hide();
+                $(item_cambiado).find(".detalle-descripcion").show().off('click');
+                $(item_cambiado).find(".detalle-linea").show();
+                $(item_cambiado).find(".detalle-iva").show();
+                $(item_cambiado).find(".detalle-precio_unitario").attr("readonly", false);
+            }
+            //Art. compuesto
+            else if ($(item_cambiado).find(".detalle-tipo").val() == 'AC') {
+                $(item_cambiado).find("span.mdl-chip").removeClass('mdl-color--blue-300 mdl-color--green-300').addClass('mdl-color--orange-300');
+                $(item_cambiado).find("span.mdl-chip span").text('AC');
+                $(item_cambiado).find(".detalle-articulo_almacenado").val("").hide();
+                $(item_cambiado).find(".detalle-descripcion").show()
+                        .attr("readonly", true)
+                        .click({"item_base": $(item_cambiado)}, componerArticulo);
+                $(item_cambiado).find(".detalle-linea").show();
+                $(item_cambiado).find(".detalle-iva").show();
+                $(item_cambiado).find(".detalle-precio_unitario").attr("readonly", false);
+            }
+        }
+
+        function updateElementIndex(el, prefix, ndx, neew) {
+            if (neew) {
+                var id_regex = new RegExp('(' + prefix + '-__prefix__-)');
+            } else {
+                var id_regex = new RegExp('(' + prefix + '-\\d+-)');
+            }
+            var replacement = prefix + '-' + ndx + '-';
+            if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex,
+                    replacement));
+            if (el.id) el.id = el.id.replace(id_regex, replacement);
+            if (el.name) el.name = el.name.replace(id_regex, replacement);
+        }
+
+        function updateCompuestoIndex(el, prefix, parent, ndx) {
+            var id_regex = new RegExp('(' + prefix + '-\\d+-__prefix__-)');
+            var replacement = prefix + '-' + parent + '-' + ndx + '-';
+            if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex,
+                    replacement));
+            if (el.id) el.id = el.id.replace(id_regex, replacement);
+            if (el.name) el.name = el.name.replace(id_regex, replacement);
+        }
+
+        function updateCompuestoParentIndex(row, prefix, old_index, new_index) {
+            function update(el, old, replacement) {
+                if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(old, replacement));
+                if (el.id) el.id = el.id.replace(old, replacement);
+                if (el.name) el.name = el.name.replace(old, replacement);
+            }
+
+            var old = prefix + '-' + old_index + '-';
+            var replacement = prefix + '-' + new_index + '-';
+
+            $(row).children().children().each(function () {
+                update(this, old, replacement);
+            });
+
+            $(row).children().each(function () {
+                update(this, old, replacement);
+            });
+        }
+
+        function actualizarTotalesFactura() {
+            subtotal_factura = 0;
+            var alics = {
+                IVA21: 0, IV105: 0, IVA27: 0, IVA00: 0, IVA: function () {
+                    return this.IVA21 + this.IV105 + this.IVA27
+                }
+            };
+            var nalics = {IVA21: 0.21, IV105: 0.105, IVA27: 0.27, IVA00: 0}
+            $("#detalle_factura .item").each(function () {
+                subtotal_factura = subtotal_factura + parseFloat($(this).find(".total").text());
+                alics[$(this).attr("data-alic")] += parseFloat($(this).find(".total").text()) * nalics[$(this).attr("data-alic")];
+            });
+            $("#importe_subtotal").text(redondear(subtotal_factura, 2));
+            $("#id_subtotal").val(redondear(subtotal_factura, 2));
+            if ($("#id_descuento").val() != "") {
+                var desc = parseFloat($("#id_descuento").val());
+            } else {
+                var desc = 0;
+            }
+            var nuevo_subtotal = subtotal_factura - (subtotal_factura * desc / 100);
+            if (letra == 'b' | letra == 'c') {
+                $("#importe_neto").text(redondear(nuevo_subtotal, 2));
+                iva = 0;
+                $("#importe_iva").text(redondear(iva, 2));
+                $("#importe_total").text(redondear(nuevo_subtotal, 2));
+            }
+            else {
+                $("#importe_neto").text(redondear(nuevo_subtotal, 2));
+                iva = alics.IVA() - (alics.IVA() * desc / 100);
+                total = nuevo_subtotal + iva;
+                $("#importe_iva").text(redondear(iva, 2));
+                $("#importe_total").text(redondear(total, 2));
+            }
+        }
+
+        function preAdecuarCompuesto(e) {
+            var b = confirm('Al cambiar el tipo de item de artículo compuesto, se perderán los cambios. ¿Desea continuar?');
+            if (b) {
+                $(e.target).prop("checked", $(e.target).prop("checked")).trigger("change");
+            }
+            else {
+                $(e.target).prop("checked", !$(e.target).prop("checked")).trigger("change");
+            }
+        }
+
+        function adecuarCompuesto(compuesto) {
+            if ($(compuesto).find(".compuesto-pers").is(":checked")) {
+                $(compuesto).find(".compuesto-articulo_almacenado").hide();
+                $(compuesto).find(".compuesto-descripcion").show();
+                $(compuesto).find(".compuesto-precio_unitario").attr("readonly", false);
+            }
+            else {
+                $(compuesto).find(".compuesto-articulo_almacenado").show();
+                $(compuesto).find(".compuesto-descripcion").hide();
+                $(compuesto).find(".compuesto-precio_unitario").attr("readonly", true);
+            }
+
+        }
+
+        function addItemFactura(prefix) {
+            var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+            if (formCount < 20) {
+                var row = $("#detalle_empty").clone()
+                        .removeAttr("style")
+                        .removeAttr("id")
+                        .addClass("item")
+                        .insertAfter("#detalle_factura tbody tr:nth-last-child(2)")
+                        .slideDown(300);
+
+                // Relabel or rename all the relevant bits
+                $(row).children().children().each(function () {
+                    updateElementIndex(this, prefix, formCount, true);
+                });
+
+                $(row).children().children().children().each(function () {
+                    updateElementIndex(this, prefix, formCount, true);
+                });
+
+                $(row).children().children().children().children().each(function () {
+                    updateElementIndex(this, prefix, formCount, true);
+                });
+
+                //Habilito el menu de cambio de articulo
+                var menu = $(row).find("ul.mdl-menu")[0];
+                $(menu).addClass('mdl-js-menu');
+                componentHandler.upgradeElement(menu);
+
+                //Habilito autocompletar
+                var options = {
+                    url: function (phrase) {
+                        if (es_b) {
+                            return "{% url "get_articulos_fk" %}" + "?ph=" + phrase + "&iva_inc";
+                        }
+                        else {
+                            return "{% url "get_articulos_fk" %}" + "?ph=" + phrase;
+                        }
+                    },
+
+                    getValue: "articulo",
+
+                    template: {
+                        type: "custom",
+                        method: function (value, item) {
+                            return '<span style="float:left;">' + item.articulo + '</span>' + '$  ' + item.precio;
+                        }
+                    },
+
+                    list: {
+                        onChooseEvent: function () {
+                            var value = $("#id_detalle-" + formCount + "-articulo_almacenado_0").getSelectedItemData().pk;
+                            var precio = $("#id_detalle-" + formCount + "-articulo_almacenado_0").getSelectedItemData().precio;
+                            var alic = $("#id_detalle-" + formCount + "-articulo_almacenado_0").getSelectedItemData().iva;
+                            $("#id_detalle-" + formCount + "-articulo_almacenado_1").val(value).trigger("change");
+                            $("#id_detalle-" + formCount + "-precio_unitario").val(precio).trigger("change");
+                            $("#id_detalle-" + formCount + "-articulo_almacenado_0").parents(".item").attr('data-alic', alic);
+                        }
+                    }
+                };
+
+                $("#id_detalle-" + formCount + "-articulo_almacenado_0").easyAutocomplete(options);
+                $("#id_detalle-" + formCount + "-articulo_almacenado_0").on("change", function () {
+                    if ($(this).val() == '') {
+                        $("#id_detalle-" + formCount + "-articulo_almacenado_1").val("").trigger("change");
+                        $("#id_detalle-" + formCount + "-precio_unitario").val("").trigger("change");
+                    }
+                });
+                $(row).find(".detalle-tipo").trigger("change");
+                // Update the total form count
+                $("#id_" + prefix + "-TOTAL_FORMS").val(formCount + 1);
+            } // End if
+            else {
+                alert("Solo se puede agregar 20 item por factura");
+            }
+        }
+
+        function deleteItemFactura(btn, prefix) {
+            function updateMGMForm(prefix, old_index, new_index) {
+                var old = prefix + '-' + old_index + '-';
+                var replacement = prefix + '-' + new_index + '-';
+
+                //Management Forms
+                $("input[id=id_" + prefix + "-" + old_index + "-TOTAL_FORMS]").attr("id", $("input[id=id_" + prefix + "-" + old_index + "-TOTAL_FORMS]").attr("id").replace(old, replacement));
+                $("input[name=" + prefix + "-" + old_index + "-TOTAL_FORMS]").attr("name", $("input[name=" + prefix + "-" + old_index + "-TOTAL_FORMS]").attr("name").replace(old, replacement));
+                $("input[id=id_" + prefix + "-" + old_index + "-INITIAL_FORMS]").attr("id", $("input[id=id_" + prefix + "-" + old_index + "-INITIAL_FORMS]").attr("id").replace(old, replacement));
+                $("input[name=" + prefix + "-" + old_index + "-INITIAL_FORMS]").attr("name", $("input[name=" + prefix + "-" + old_index + "-INITIAL_FORMS]").attr("name").replace(old, replacement));
+                $("input[id=id_" + prefix + "-" + old_index + "-MIN_NUM_FORMS]").attr("id", $("input[id=id_" + prefix + "-" + old_index + "-MIN_NUM_FORMS]").attr("id").replace(old, replacement));
+                $("input[name=" + prefix + "-" + old_index + "-MIN_NUM_FORMS]").attr("name", $("input[name=" + prefix + "-" + old_index + "-MIN_NUM_FORMS]").attr("name").replace(old, replacement));
+                $("input[id=id_" + prefix + "-" + old_index + "-MAX_NUM_FORMS]").attr("id", $("input[id=id_" + prefix + "-" + old_index + "-MAX_NUM_FORMS]").attr("id").replace(old, replacement));
+                $("input[name=" + prefix + "-" + old_index + "-MAX_NUM_FORMS]").attr("name", $("input[name=" + prefix + "-" + old_index + "-MAX_NUM_FORMS]").attr("name").replace(old, replacement));
+
+            }
+
+            var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+            if (formCount > 1) {
+                //Si es AC borrar todos los hijos
+                if ($(btn).parents(".item").find(".detalle-tipo").val() == 'AC') {
+                    var regex = /detalle-(\d+)-/g;
+                    var num = regex.exec($(btn).parents(".detalle").find(".detalle-cantidad").attr("id"));
+                    $('.compuesto[data-detalle="' + num[1] + '"]').each(function () {
+                        $(this).remove();
+                    });
+                    $('input[name="compuesto-' + num[1] + '-TOTAL_FORMS"]').remove();
+                    $('input[name="compuesto-' + num[1] + '-INITIAL_FORMS"]').remove();
+                    $('input[name="compuesto-' + num[1] + '-MIN_NUM_FORMS"]').remove();
+                    $('input[name="compuesto-' + num[1] + '-MAX_NUM_FORMS"]').remove();
+                }
+                // Delete the item/form
+                $(btn).parents('.item').remove();
+                var forms = $('.item'); // Get all the forms
+                // Update the total number of forms (1 less than before)
+                $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
+                var i = 0;
+                // Go through the forms and set their indices, names and IDs
+                for (formCount = forms.length; i < formCount; i++) {
+                    var deta = $(forms.get(i));
+                    if (deta.find(".detalle-tipo").val() == 'AC') {
+                        var regex = /detalle-(\d+)-/g;
+                        var num = regex.exec(deta.find(".detalle-cantidad").attr("id"))[1];
+
+                        $('dialog tr.compuesto[data-detalle="' + num + '"]').each(function () {
+                            $(this).attr("data-detalle", i);
+                            updateMGMForm("compuesto", num, i);
+                            updateCompuestoParentIndex(this, "compuesto", num, i);
+                        });
+                    }
+                    $(forms.get(i)).children().children().each(function () {
+                        updateElementIndex(this, prefix, i, false);
+                    });
+                }
+                actualizarTotalesFactura();
+            } // End if
+            else {
+                alert("La factura debe contener al menos un item");
+            }
+            return false;
+        }
+
+        //Paso como param la fila que se agrego o actualizo
+        function actualizarPTItemFactura(item) {
+            var cantidad = $(item).find(".detalle-cantidad");
+            var pu = $(item).find(".detalle-precio_unitario");
+            var total = $(item).find(".total");
+            var descuento = $(item).find(".detalle-descuento");
+            if (cantidad.val() && pu.val()) {
+                if (cantidad.val().split(":").length - 1 == 1) {//Es tiempo, hay un ":"
+                    var cantidad_v = parseInt(cantidad.val().split(":")[0]) + parseInt(cantidad.val().split(":")[1]) / 60;
+                } else {
+                    var cantidad_v = parseFloat(cantidad.val());
+                }
+                total.text(redondear(parseFloat(pu.val()) * cantidad_v, 2));
+                var total_v = parseFloat(total.text());
+                if (parseFloat(descuento.val()) > 0.00) {
+                    total_v = total_v - (total_v * parseFloat(descuento.val()) / 100);
+                    total.text(redondear(total_v, 2));
+                }
+                actualizarTotalesFactura();
+            } else {
+                total.text("0.00");
+            }
+        }
+
+        //Paso la fila en la que se va a componer el articulo
+        function componerArticulo(e) {
+            function addMGMForm(prefix, new_index) {
+                var t = prefix + "-" + new_index;
+                $("<input>", {
+                    id: "id_" + t + "-TOTAL_FORMS",
+                    name: t + "-TOTAL_FORMS",
+                    type: "hidden",
+                    value: 1
+                }).appendTo("dialog");
+                $("<input>", {
+                    id: "id_" + t + "-INITIAL_FORMS",
+                    name: t + "-INITIAL_FORMS",
+                    type: "hidden",
+                    value: 0
+                }).appendTo("dialog");
+                $("<input>", {
+                    id: "id_" + t + "-MIN_NUM_FORMS",
+                    name: t + "-MIN_NUM_FORMS",
+                    type: "hidden",
+                    value: 0
+                }).appendTo("dialog");
+                $("<input>", {
+                    id: "id_" + t + "-MAX_NUM_FORMS",
+                    name: t + "-MAX_NUM_FORMS",
+                    type: "hidden",
+                    value: 1000
+                }).appendTo("dialog");
+            }
+
+            //Numero de detalle, 0-indexed
+            var regex = /detalle-(\d+)-/;
+            var n_item = regex.exec($(e.data.item_base).find(".detalle-tipo").attr("id"))[1];
+            //$("#add_item_articulo_compuesto").attr("data-actual_parent", num[1]);
+            //Determino si ya hay items que correspondan a este detalle
+            $("tr.compuesto").hide();
+            var compuestos = $("tr.compuesto[data-detalle=" + n_item + "]");
+            if (compuestos.length > 0) {
+                $("tr.compuesto[data-detalle=" + n_item + "]").show();
+                $("#descripcion-articulo-compuesto").val($(e.data.item_base).find(".detalle-descripcion").val());
+            }
+            else {
+                $("#descripcion-articulo-compuesto").val("");
+                addMGMForm("compuesto", n_item);
+                var comp_row = $("#compuesto-empty").clone()
+                        .removeAttr("style")
+                        .removeAttr("id")
+                        .addClass("compuesto")
+                        .attr("data-detalle", n_item)
+                        .insertAfter("#tabla-compuesto tbody tr:nth-last-child(1)")
+                        .slideDown(300);
+                // Relabel or rename all the relevant bits
+                $(comp_row).children().children().each(function () {
+                    updateCompuestoIndex(this, "compuesto", n_item, 0);
+                });
+
+                //Habilito autocompletar
+                var options = {
+                    url: function (phrase) {
+                        if (es_b) {
+                            return "{% url "get_articulos_fk" %}" + "?ph=" + phrase + "&iva_inc";
+                        }
+                        else {
+                            return "{% url "get_articulos_fk" %}" + "?ph=" + phrase;
+                        }
+                    },
+
+                    getValue: "articulo",
+
+                    template: {
+                        type: "custom",
+                        method: function (value, item) {
+                            return '<span style="float:left;">' + item.articulo + '</span>' + '$  ' + item.precio;
+                        }
+                    },
+
+                    list: {
+                        onChooseEvent: function () {
+                            var value = $("#id_compuesto-" + n_item + "-0-articulo_almacenado_0").getSelectedItemData().pk;
+                            var precio = $("#id_compuesto-" + n_item + "-0-articulo_almacenado_0").getSelectedItemData().precio;
+                            $("#id_compuesto-" + n_item + "-0-articulo_almacenado_1").val(value).trigger("change");
+                            $("#id_compuesto-" + n_item + "-0-precio_unitario").val(precio).trigger("change");
+                        }
+                    }
+                };
+
+                $("#id_compuesto-" + n_item + "-0-articulo_almacenado_0").easyAutocomplete(options);
+                $("#id_compuesto-" + n_item + "-0-articulo_almacenado_0").on("change", function () {
+                    if ($(this).val() == '') {
+                        $("#id_compuesto-" + n_item + "-0-articulo_almacenado_1").val("").trigger("change");
+                        $("#id_compuesto-" + n_item + "-0-precio_unitario").val("").trigger("change");
+                    }
+                });
+            }
+            $(comp_row).find(".compuesto-pers").trigger("change");
+            $("dialog #add_item_compuesto").attr("data-detalle", n_item);
+            if (!comp_dialog.showModal) {
+                dialogPolyfill.registerDialog(comp_dialog);
+            }
+            comp_dialog.showModal();
+            $(comp_dialog).find('.close').one('click', function () {
+                var det = $(".item").get(n_item);
+                $(det).find(".detalle-precio_unitario").val($("#total-compuesto").text());
+                $(det).find(".detalle-descripcion").val($("#descripcion-articulo-compuesto").val());
+                $(det).find(".detalle-descripcion").val($("#descripcion-articulo-compuesto").val());
+                comp_dialog.close();
+            });
+            actualizarTotalesArtComp();
+        }
+
+        function addItemArtCompuesto(prefix, parent) {
+            var formCount = parseInt($('#id_' + prefix + '-' + parent + '-TOTAL_FORMS').val());
+            var comp_row = $("#compuesto-empty").clone()
+                    .removeAttr("style")
+                    .removeAttr("id")
+                    .addClass("compuesto")
+                    .attr("data-detalle", parent)
+                    .insertAfter("#tabla-compuesto tbody tr:nth-last-child(1)")
+                    .slideDown(300);
+            // Relabel or rename all the relevant bits
+            $(comp_row).children().children().each(function () {
+                updateCompuestoIndex(this, "compuesto", parent, formCount);
+            });
+
+            $(comp_row).children().children().children().each(function () {
+                updateCompuestoIndex(this, "compuesto", parent, formCount);
+            });
+
+            //Habilito autocompletar
+            var options = {
+                url: function (phrase) {
+                    if (es_b) {
+                        return "{% url "get_articulos_fk" %}" + "?ph=" + phrase + "&iva_inc";
+                    }
+                    else {
+                        return "{% url "get_articulos_fk" %}" + "?ph=" + phrase;
+                    }
+                },
+
+                getValue: "articulo",
+
+                template: {
+                    type: "custom",
+                    method: function (value, item) {
+                        return '<span style="float:left;">' + item.articulo + '</span>' + '$  ' + item.precio;
+                    }
+                },
+
+                list: {
+                    onChooseEvent: function () {
+                        var value = $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_0").getSelectedItemData().pk;
+                        var precio = $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_0").getSelectedItemData().precio;
+                        $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_1").val(value).trigger("change");
+                        $("#id_compuesto-" + parent + "-" + formCount + "-precio_unitario").val(precio).trigger("change");
+                    }
+                }
+            };
+
+            $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_0").easyAutocomplete(options);
+            $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_0").on("change", function () {
+                if ($(this).val() == '') {
+                    $("#id_compuesto-" + parent + "-" + formCount + "-articulo_almacenado_1").val("").trigger("change");
+                    $("#id_compuesto-" + parent + "-" + formCount + "-precio_unitario").val("").trigger("change");
+                }
+            });
+            $(comp_row).find(".compuesto-pers").trigger("change");
+
+            // Update the total form count
+            $("#id_" + prefix + "-" + parent + "-TOTAL_FORMS").val(formCount + 1);
+        }
+
+        //Paso la fila que se actualizo o agrego
+        function actualizarPTArticuloCompuesto(item_compuesto) {
+            var cantidad = $(item_compuesto).find(".compuesto-cantidad");
+            var pu = $(item_compuesto).find(".compuesto-precio_unitario");
+            if (cantidad.val() && pu.val()) {
+                if (cantidad.val().split(":").length - 1 == 1) {//Es tiempo, hay un ":"
+                    var cant = parseInt(cantidad.val().split(":")[0]) + parseInt(cantidad.val().split(":")[1]) / 60
+                } else {
+                    var cant = parseFloat(cantidad.val())
+                }
+                var tot = cant * parseFloat(pu.val());
+                $(item_compuesto).find(".total").text(redondear(tot, 2));
+                actualizarTotalesArtComp();
+            } else {
+                $(item_compuesto).find(".total").text("0.00");
+            }
+        }
+
+        function actualizarTotalesArtComp() {
+            var total_art_comp = 0;
+            $(".compuesto:visible").each(function () {
+                total_art_comp = total_art_comp + parseFloat($(this).find(".total").text());
+            });
+            $("#total-compuesto").text(redondear(total_art_comp, 2));
+        }
+
+        $(document).ready(function () {
+            //LISTENER PARA DATOS DE COMPROBANTE
+            $(document).on("change", "#id_cliente_1, #id_tipoDisplay", function () {
+                if ($("#id_cliente_1").val() != "") {
+                    $.ajax({
+                        url: "{% url 'get_comprobante_info' %}",
+
+                        data: {id_cliente: $("#id_cliente_1").val(), tipo: $("#id_tipoDisplay").val()},
+                        type: 'GET',
+                        dataType: 'json',
+
+                        success: function (json) {
+                            letra = json.letra;
+                            if (json.letra == "b") {
+                                es_b = true;
+                            } else {
+                                es_b = false;
+                            }
+                            $("#info_comprobante").text(json.info);
+                        },
+                    });
+
+                    {#                    $.ajax({#}
+                    {#                        url: "{% url "get_posibles_comprobantes_relacionados" %}",#}
+                    {##}
+                    {#                        data: {id_cliente: $("#id_cliente").val()},#}
+                    {#                        type: 'GET',#}
+                    {#                        dataType: 'json',#}
+                    {##}
+                    {#                        success: function (json) {#}
+                    {#                            if (json) {#}
+                    {#                                json.each(function () {#}
+                    {#                                    var co = jQuery.parseJSON(this);#}
+                    {#                                    $("option").text(co.info).appendTo("#id_comprobantes_relacionados");#}
+                    {#                                })#}
+                    {#                                $('#id_comprobantes_relacionados').prop('disabled', false);#}
+                    {#                            }#}
+                    {#                            else {#}
+                    {#                                $('#id_comprobantes_relacionados').clear().prop('disabled', true);#}
+                    {#                            }#}
+                    {##}
+                    {#                        },#}
+                    {#                    });#}
+                }
+                else {
+                    $("#info_comprobante").text("--------------");
+                }
+            });
+
+            $("#id_tipoDisplay").trigger("change");
+
+            //            LISTENER PARA CAMBIO DE TIPO DE ARTICULO
+            $("#detalle_factura").on("change", "input.detalle-tipo", function () {
+                adecuarItem($(this).parents(".item"));
+            });
+
+            $('.detalle-tipo').trigger("change");
+
+            $("dialog").on("change", "input.compuesto-pers", function () {
+                adecuarCompuesto($(this).parents(".compuesto"));
+            });
+
+            $("dialog").on("click", "input.compuesto-pers", preAdecuarCompuesto);
+
+            $("dialog input.compuesto-pers").trigger("change");
+            {##}
+            {#            $('.tipo_articulo_select').trigger("change");#}
+            {##}
+            $("#add_item_factura").click(function () {
+                addItemFactura("detalle");
+            });
+
+            $("#add_item_compuesto").click(function () {
+                addItemArtCompuesto("compuesto", $(this).attr("data-detalle"));
+            });
+
+            {#            HANDLERS PARA EVENTOS DE DETALLE DE FACTURA#}
+            {#            $("#detalle_factura").on("click", ".composicion_articulo", function () {#}
+            {#                componerArticulo($(this).parents(".item"));#}
+            {#            });#}
+            {##}
+            // Agrego el handler para borrar, y actualizar los precios
+            $("#detalle_factura").on("click", ".delete", function () {
+                deleteItemFactura(this, "detalle");
+            });
+
+            $("#detalle_factura").on("change", ".detalle-cantidad, .detalle-precio_unitario, .detalle-descuento", function () {
+                actualizarPTItemFactura($(this).parents(".item"));
+            });
+
+            $("#detalle_factura").on("change", "select.detalle-iva", function () {
+                $(this).parents(".item").attr("data-alic", $(this).val());
+                actualizarPTItemFactura($(this).parents(".item"));
+            });
+
+            $("#id_descuento").on("change", function () {
+                actualizarTotalesFactura();
+            });
+
+            {#            // Agrego el handler para borrar, y actualizar los precios#}
+            {#            $("#detalle_composicion_articulo").on("click", ".delete", function () {#}
+            {#                var ap = $("#add_item_articulo_compuesto").attr("data-actual_parent")#}
+            {#                deleteItemArtCompuesto(this, "art_comp-" + ap);#}
+            {#            });#}
+            {##}
+            //Evento de cambio de cantidad o precio unitario en art compuesto
+            $("dialog").on("change", ".compuesto-cantidad, .compuesto-precio_unitario", function () {
+                actualizarPTArticuloCompuesto($(this).parents(".compuesto"));
+            });
+
+            {#            $("#detalle_composicion_articulo").on("click", ".denominacion_articulo", function () {#}
+            {#                seleccionarArticuloAlmacenado($(this).parents(".item_composicion_articulo"));#}
+            {#            });#}
+            {##}
+            {#            //METODOS IMPLEMENTADOS EN EL UPDATE DE VENTAS#}
+            {#            if ($("#id_cliente").val() != "") {#}
+            {#                $.ajax({#}
+            {#                    url: "{% url 'get_comprobante_info' %}",#}
+            {##}
+            {#                    data: {id_cliente: $("#id_cliente").val(), tipo: $("#id_tipoDisplay").val()},#}
+            {#                    type: 'GET',#}
+            {#                    dataType: 'json',#}
+            {#                    async: false,#}
+            {##}
+            {#                    success: function (json) {#}
+            {#                        letra = json.letra;#}
+            {#                        $("#info_comprobante").text(json.info);#}
+            {#                    },#}
+            {#                });#}
+            {#                $(".item").each(function () {#}
+            {#                    actualizarPTItemFactura($(this));#}
+            {#                });#}
+            {#            }#}
+            {##}
+            {#            //ACTUALIZO ARRAY DE ITEMS CON COMPUESTOS#}
+            {#            $(".item").each(function () {#}
+            {#                if ($(this).find("select.tipo_articulo_select").val() == "AC") {#}
+            {#                    var regex = /det_venta-(\d+)-/g;#}
+            {#                    var num = regex.exec($(this).find(".articulo_input").attr("id"));#}
+            {#                    items_compuestos[items_compuestos.length] = num[1]#}
+            {#                }#}
+            {#            });#}
+            {##}
+            {##}
+            {#            var validation_config = {#}
+            {#                rules: {#}
+            {#                    clienteDisplay: 'client_valid',#}
+            {#                    'fecha': {#}
+            {#                        required: true,#}
+            {#                        dateITA: true,#}
+            {#                    },#}
+            {#                    'condicion_venta': {#}
+            {#                        required: true,#}
+            {#                    },#}
+            {#                    'descripcion_articulo_compuesto': {#}
+            {#                        required: {#}
+            {#                            depends: function (element) {#}
+            {#                                return !$(element).is(":hidden");#}
+            {#                            }#}
+            {#                        },#}
+            {#                    },#}
+            {#                },#}
+            {#                errorElement: "div",#}
+            {#                errorClass: "error",#}
+            {#                onfocusout: false,#}
+            {#                ignore: "",#}
+            {#                invalidHandler: function () {#}
+            {#                    console.log(valid.numberOfInvalids() + " field(s) are invalid");#}
+            {#                },#}
+            {#                success: ""#}
+            {#            };#}
+            {#            var valid = $("form").validate(validation_config);#}
+            {#            //VALIDACIONES FRONT-END#}
+            {#            // Add custom validation rule#}
+            {#            jQuery.validator.addMethod(#}
+            {#                    'client_valid',#}
+            {#                    function (value, el) {#}
+            {#                        if ($(el).parents("form").find("#id_cliente").val() != "" && value.length > 0) {#}
+            {#                            return true#}
+            {#                        } else {#}
+            {#                            return false#}
+            {#                        }#}
+            {#                    },#}
+            {#                    'Selecciona un cliente valido'#}
+            {#            );#}
+            {#            //GENERATE VALIDATION CLASS, FOR FORMSET FIELDS#}
+            {#            function is_ac(element) {#}
+            {#                var regex = /art_comp-(\d+)-/g;#}
+            {#                var num = regex.exec($(element).attr("id"));#}
+            {#                return $("option:selected", $($(".item")[num[1]]).find(".tipo_articulo_select")).val() == "AC"#}
+            {#            }#}
+            {##}
+            {#            jQuery.validator.addClassRules({#}
+            {#                cantidad_input_detalle: {#}
+            {#                    required: true,#}
+            {#                    number: true#}
+            {#                },#}
+            {#                precio_unitario_input_detalle: {#}
+            {#                    required: true,#}
+            {#                    number: true#}
+            {#                },#}
+            {#                articulo_input_detalle: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return $("option:selected", $(element).parents(".item").find(".tipo_articulo_select")).val() == 'AA'#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                linea_articulo_personalizado_select_detalle: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return $("option:selected", $(element).parents(".item").find(".tipo_articulo_select")).val() == 'AP'#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                iva_articulo_personalizado_select_detalle: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return $("option:selected", $(element).parents(".item").find(".tipo_articulo_select")).val() == 'AP'#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                articulo_personalizado_input_detalle: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return $("option:selected", $(element).parents(".item").find(".tipo_articulo_select")).val() == 'AP'#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                cantidad_input_compuesto: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return is_ac(element)#}
+            {#                        }#}
+            {#                    },#}
+            {#                    number: true#}
+            {#                },#}
+            {#                precio_unitario_input_compuesto: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return is_ac(element)#}
+            {#                        }#}
+            {#                    },#}
+            {#                    number: true#}
+            {#                },#}
+            {#                articulo_input_compuesto: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            var pers = !$(element).parents(".item_composicion_articulo").find(".pers_checkbox").is(":checked")#}
+            {#                            return pers && is_ac(element)#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                linea_articulo_personalizado_select_compuesto: {#}
+            {#                    required: false#}
+            {#                },#}
+            {#                iva_articulo_compuesto_select_detalle: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            return $("option:selected", $(element).parents(".item").find(".tipo_articulo_select")).val() == 'AC'#}
+            {#                        }#}
+            {#                    }#}
+            {#                },#}
+            {#                articulo_personalizado_input_compuesto: {#}
+            {#                    required: {#}
+            {#                        depends: function (element) {#}
+            {#                            var pers = $(element).parents(".item_composicion_articulo").find(".pers_checkbox").is(":checked")#}
+            {#                            var regex = /art_comp-(\d+)-/g;#}
+            {#                            var num = regex.exec($(element).attr("id"));#}
+            {#                            var ac = $("option:selected", $($(".item")[num[1]]).find(".tipo_articulo_select")).val() == "AC"#}
+            {#                            return pers && ac#}
+            {#                        }#}
+            {#                    }#}
+            {#                }#}
+            {#            });#}
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block pageTitle %}
+    RUBROS
+{% endblock %}
+
+{% block siteTitle %}
+    RUBROS
+{% endblock %}
+{
+
+{% block actionButtons %}
+    <button onclick='$("form").submit()' class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--accent"
+            type="submit"><i class="material-icons">send</i></button>
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-color--grey-400" onclick="history.back()"><i class="material-icons">clear</i></button>
+{% endblock %}
+
+{% block container %}
+    <form method="post" autocomplete="off" novalidate>{% csrf_token %}
+        {{ form.as_mdl }}
+    </form>
+    <script>
+        $.validate({
+            lang: 'es',
+        });
+    </script>
+{% endblock %}

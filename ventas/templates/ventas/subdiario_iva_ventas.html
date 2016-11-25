@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment-with-locales.min.js"></script>
+    <link rel="stylesheet" type="text/css"
+          href="http://t00rk.github.io/bootstrap-material-datetimepicker/css/bootstrap-material-datetimepicker.css">
+    <script src="http://t00rk.github.io/bootstrap-material-datetimepicker/js/bootstrap-material-datetimepicker.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#id_fecha_desde').bootstrapMaterialDatePicker({
+                format: "DD/MM/YYYY",
+                time: false,
+                nowButton: true,
+                lang: 'es',
+                cancelText: "Cancelar",
+                nowText: "Hoy"
+            });
+            $('#id_fecha_hasta').bootstrapMaterialDatePicker({
+                format: "DD/MM/YYYY",
+                time: false,
+                nowButton: true,
+                lang: 'es',
+                cancelText: "Cancelar",
+                nowText: "Hoy"
+            });
+            $("#id_fecha_desde").hide();
+            $("#id_fecha_hasta").hide();
+
+            $("input[type=radio][name=por]").change(function () {
+                if (this.value == 'periodo') {
+                    $("#id_fecha_desde").hide();
+                    $("#id_fecha_hasta").hide();
+                    $("#id_periodo_0").show();
+                }
+                else if (this.value == 'fecha') {
+                    $("#id_periodo_0").hide();
+                    $("#id_fecha_desde").show();
+                    $("#id_fecha_hasta").show();
+                }
+
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block pageTitle %}
+    Subdiario Iva Ventas
+{% endblock %}
+
+{% block container %}
+    <div class="mdl-grid">
+        <form class="mdl-shadow--2dp mdl-color--white" autocomplete="off" novalidate method="POST"
+              style="width: 650px;margin: auto;">
+            {% csrf_token %}
+            <div class="mdl-grid">
+                <div class="mdl-cell--12-col">
+                    <div class="mdl-textfield mdl-js-textfield">
+                        {{ subdiario.folio_inicial }}
+                        {{ subdiario.folio_inicial.label_tag }}
+                    </div>
+                </div>
+            </div>
+            <div class="mdl-grid">
+                <div class="mdl-cell">
+                    <p>Informar Por</p>
+                </div>
+                <div class="mdl-cell">{{ subdiario.por.0 }}</div>
+                <div class="mdl-cell">{{ subdiario.por.1 }}</div>
+            </div>
+            <div class="mdl-grid">
+                <div class="mdl-cell--12-col">{{ subdiario.periodo }}
+                    <script>
+                        var options = {
+                            url: function (phrase) {
+                                return "{% url "get_periodos_fk" %}" + "?ph=" + phrase;
+                            },
+
+                            getValue: "nombre",
+
+                            list: {
+                                onChooseEvent: function () {
+                                    var value = $("#id_periodo_0").getSelectedItemData().pk;
+                                    $("#id_periodo_1").val(value).trigger("change");
+                                }
+                            }
+                        };
+
+                        $("#id_periodo_0").easyAutocomplete(options);
+                        $("#id_periodo_0").on("change", function () {
+                            if ($(this).val() == '') {
+                                $("#id_periodo_1").val("").trigger("change");
+                            }
+                        });
+                    </script>
+                </div>
+                <div class="mdl-cell--6-col">{{ subdiario.fecha_desde }}</div>
+                <div class="mdl-cell--6-col">{{ subdiario.fecha_hasta }}</div>
+            </div>
+            <div class="mdl-grid">
+                <div class="mdl-cell--12-col">
+                    <a class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect" role="button"
+                       href="{% url "home" %}">Cancelar</a>
+                    <input class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent"
+                           role="button" value="ACEPTAR" type="submit"></div>
+            </div>
+
+        </form>
+{% endblock %}

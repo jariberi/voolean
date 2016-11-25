@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+{% block actionButtons %}
+    <a onclick="history.back()"
+       class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+        <i class="material-icons">clear</i>
+    </a>
+    <a onclick="$('form').submit();"
+       class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+        <i class="material-icons">done</i>
+    </a>
+{% endblock %}
+
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+    <script src="{% static "js/app.js" %}"></script>
+    <script>
+        //Funciones
+        function submitFormDef() {
+            var form = $("form");
+            $("input[type='submit']").attr('disabled', true);
+            $.post(form.attr('action'), form.serialize(), function (data) {
+                var json_val = JSON.parse(data);
+                window.open('/cobros/impr_recibo/' + json_val.id, '_blank');
+                window.location.replace({% url "listaCobros" %});
+            });
+        }
+
+        function buscarNumRec() {
+            $.ajax({
+                url: "{% url "get_num_recibo" %}",
+                beforeSend: function () {
+                    $("label#numero_recibo").text("Obteniendo datos...");
+                },
+                success: function (response) {
+                    $("label#numero_recibo").text("Nro: " + ("00000000" + response).slice(-8));
+                }
+            });
+
+        }
+
+        function updateElementIndex(el, prefix, ndx, is_new) {
+            if (is_new) {
+                var id_regex = new RegExp('(' + prefix + '-__prefix__-)');
+            }
+            else {
+                var id_regex = new RegExp('(' + prefix + '-\\d+-)');
+            }
+            var replacement = prefix + '-' + ndx + '-';
+            if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex,
+                    replacement));
+            if (el.id) el.id = el.id.replace(id_regex, replacement);
+            if (el.name) el.name = el.name.replace(id_regex, replacement);
+        }
+
+        function addFactura(prefix) {
+            var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+            var row = $("#cobro-empty").clone()
+                    .removeAttr("style")
+                    .removeAttr("id")
+                    .addClass("item")
+                    .insertAfter("#comprobantes-pendientes tbody tr:nth-last-child(1)")
+                    .slideDown(300);
+
+            // Relabel or rename all the relevant bits
+            $(row).children().children().each(function () {
+                updateElementIndex(this, prefix, formCount, true);
+            });
+            $(row).children().each(function () {
+                updateElementIndex(this, prefix, formCount, true);
+            });
+
+            // Update the total form count
+            $("#id_" + prefix + "-TOTAL_FORMS").val(formCount + 1);
+        }
+
+        function llenarTablaComprobantes(json_data) {
+            for (var i = 0; i < json_data.length; i++) {
+                addFactura("cobros");//Copia la primera fila, la que modifique antes y cambia los id
+                $("#id_cobros-" + i + "-fecha").text(convertDate(json_data[i].fields.fecha));
+                $("#id_cobros-" + i + "-nro_factura").text((("000" + json_data[i].fields.punto_venta).slice(-4)) + "-" + ("000000000" + json_data[i].fields.numero).slice(-8));
+                $("#id_cobros-" + i + "-total").text(json_data[i].fields.total);
+                $("#id_cobros-" + i + "-saldo").text(json_data[i].fields.saldo);
+                $("#id_cobros-" + i + "-id_factura").val(json_data[i].pk);
+                $("#id_cobros-" + i + "-pagar").val(json_data[i].fields.saldo);
+            }
+        }
+
+        function adecuarFilaValor(el) {
+            var valor = $("option:selected", el).val();
+            if (valor == "CHT") {
+                $(el).parents(".item").find(".seccion_cheque").show();
+                $(el).parents(".item").find(".no_se_necesita").hide();
+                $(el).parents(".item").find(".seccion_transferencia").hide();
+            }
+            else if (valor == "TRB") {
+                $(el).parents(".item").find(".seccion_cheque").hide();
+                $(el).parents(".item").find(".no_se_necesita").hide();
+                $(el).parents(".item").find(".seccion_transferencia").show();
+            }
+            else if (valor == "EFE") {
+                $(el).parents(".item").find(".seccion_cheque").hide();
+                $(el).parents(".item").find(".no_se_necesita").show();
+                $(el).parents(".item").find(".seccion_transferencia").hide();
+            }
+        }
+
+
+        $(document).ready(function () {
+            var total_facturas;
+            var total_valores;
+            var total_entregas;
+            var credito;
+
+            function calcularTotalFacturas() {
+                total_facturas = 0;
+                $(".saldo_factura:visible").each(function () {
+                    total_facturas = total_facturas + parseFloat($(this).text());
+                });
+                $("#total_facturas").text(redondear(total_facturas, 2));
+                var tot_desc = total_facturas - credito;
+                $("#total_facturas_credito").text(redondear(tot_desc, 2));
+            }
+
+            function calcularEntregaFacturas() {
+                total_entregas = 0;
+                $(".entrega_input:visible").each(function () {
+                    total_entregas = total_entregas + parseFloat($(this).val())
+                });
+                $("#total_entregas").text(redondear(total_entregas, 2));
+                var tot_entr_desc = total_entregas - credito;
+                $("#total_entregas_credito").text(redondear(tot_entr_desc, 2));
+            }
+
+            function calcularTotalValores() {
+                console.log(parseFloat($("label#monto_a_credito").text()))
+                if ($("label#monto_a_credito").is(":visible") && parseFloat($("label#monto_a_credito").text()) > 0) {
+                    total_valores = parseFloat($("label#monto_a_credito").text());
+                }
+                else {
+                    total_valores = 0;
+                }
+
+                $(".monto_input").each(function () {
+                    if ($(this).val()) {
+                        total_valores = total_valores + parseFloat($(this).val());
+                    } else {
+                        total_valores = total_valores + 0;
+                    }
+                });
+                $("#total_valores").text(redondear(total_valores, 2));
+            }
+
+
+            function borrarValor(btn, prefix) {
+                var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+                if (formCount > 1) {
+                    // Borrar el valor
+                    $(btn).parents('.item').remove();
+                    var forms = $('#detalle_valores .item'); // Obtengo todos los formularios
+                    // Actualizo el numero de valores (1 menos el anterior)
+                    $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
+                    var i = 0;
+                    // Recorro los valores y seteo sus indices, id, etc
+                    for (formCount = forms.length; i < formCount; i++) {
+                        $(forms.get(i)).find("input, label, select").each(function () {
+                            updateElementIndex(this, prefix, i, false);
+                        });
+                    }
+                } // End if
+                else {
+                    alert("El recibo debe contener al menos un valor");
+                }
+            }
+
+            function agregarValor(btn, prefix) {
+                var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+                if (formCount < 20) {
+                    var row = $("#valor-empty").clone()
+                            .removeAttr("style")
+                            .removeAttr("id")
+                            .addClass("item")
+                            .insertAfter("#detalle_valores tbody tr:nth-last-child(1)")
+                            .slideDown(300);
+
+                    // Relabel or rename all the relevant bits
+                    $(row).find("input, select, label").each(function () {
+                        updateElementIndex(this, prefix, formCount, true);
+                    });
+                    // Agregar al componentHandler del MDL para su correcto funcionamiento
+                    $(row).find("input").each(function () {
+                        componentHandler.upgradeElement($(this));
+                    });
+
+                    {#                            //Acomodo la fila a cheque#}
+                    {#                            $(row).find(".tipo_valor_select").val("CHT");#}
+                    {#                            adecuarFilaValor($(row).find(".tipo_valor_select"));#}
+                    {##}
+                    {#                            // Handler de evento de cambio de seleccion de tipo de valor#}
+                    {#                            $(row).find(".tipo_valor_select").change(function () {#}
+                    {#                                return adecuarFilaValor(this);#}
+                    {#                            });#}
+                    {##}
+                    {#                            //Handler de Evento de borrado de valor#}
+                    {#                            $(row).find(".borrar").click(function () {#}
+                    {#                                return borrarValor(this, "valores");#}
+                    {#                            });#}
+                    {##}
+                    {#                            //Handler de evento de calculo de total#}
+                    {#                            $(row).find(".monto_input").change(function () {#}
+                    {#                                return calcularTotalValores();#}
+                    {#                            });#}
+
+                    $.get("/cobros/get_datos_cheque_defecto/" + $("#id_cliente_1").val(), function (data) {
+                        if (data) {
+                            var json_val = JSON.parse(data);
+                            if (json_val) {
+                                $(row).find(".cheque_fecha_input").val(json_val.fecha).parents(".mdl-textfield").addClass("is-dirty");
+                                $(row).find(".cheque_titular_input").val(json_val.razon_social).parents(".mdl-textfield").addClass("is-dirty");
+                                $(row).find(".cheque_paguese_a_input").val(json_val.paguese_a).parents(".mdl-textfield").addClass("is-dirty");
+                                $(row).find(".cheque_cuit_titular_input").val(json_val.cuit).parents(".mdl-textfield").addClass("is-dirty");
+                            }
+                        }
+                    })
+
+
+                    // Update the total form count
+                    $("#id_" + prefix + "-TOTAL_FORMS").val(formCount + 1);
+                } // End if
+                else {
+                    alert("Solo se puede agregar 20 valores por recibo");
+                }
+                return false;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////
+            ///////////////////////Ejecutables
+            ////////////////////////////////////////////////////////////////////////////////////////////////
+            buscarNumRec();
+
+            $("#comprobantes-pendientes").hide();
+            $("#sin_comprobantes").hide();
+            $(".seccion_transferencia").hide();
+            {#    $(".no_se_necesita").hide();#}
+
+            $("#id_cliente_1").change(function () {
+                //$("#id_cobros-TOTAL_FORMS").val(1);
+                $("#detalle_comprobantes .item").remove();
+                var cli = $(this).val();
+                $.get("/cobros/get_facturas_pendiente_pago/" + cli, function (data) {
+                    if (data.length > 0) {
+                        $("#seleccione_una_empresa").hide();
+                        $("#comprobantes-pendientes").show();
+                        $("#sin_comprobantes").hide();
+                        llenarTablaComprobantes(data);
+                    }
+                    else {
+                        $("#sin_comprobantes").show();
+                        $("#seleccione_una_empresa").hide();
+                        $("#comprobantes-pendientes").hide();
+                    }
+
+
+                    $.get("/cobros/get_credito_valores/" + cli, function (data) {
+                        if (data) {
+                            var json_val = JSON.parse(data);
+                            if (json_val) {
+                                //var html = 'A CREDITO: $<label id="monto_a_credito">'+json_val.pendiente+'</label>'
+                                credito = json_val.pendiente;
+                                $(".a_credito").html(json_val.pendiente);
+                                //$("#id_credito_anterior").val(json_val.pendiente)
+                            }
+                        }
+                        else {
+                            $(".a_credito").text("0.00");
+                            credito = 0;
+                        }
+                        calcularTotalFacturas();
+                        calcularEntregaFacturas();
+                    });
+                });
+
+                $.get("/cobros/get_datos_cheque_defecto/" + cli, function (data) {
+                    if (data) {
+                        var json_val = JSON.parse(data);
+                        if (json_val) {
+                            $(".cheque_fecha_input").val(json_val.fecha).parents(".mdl-textfield").addClass("is-dirty");
+                            $(".cheque_titular_input").val(json_val.razon_social).parents(".mdl-textfield").addClass("is-dirty");
+                            ;
+                            $(".cheque_paguese_a_input").val(json_val.paguese_a).parents(".mdl-textfield").addClass("is-dirty");
+                            ;
+                            $(".cheque_cuit_titular_input").val(json_val.cuit).parents(".mdl-textfield").addClass("is-dirty");
+                            ;
+                        }
+                    }
+                });
+            });
+
+            {#    // Evento de cambio de seleccion de tipo de valor#}
+            $("form").on("change", ".tipo_valor_select", function () {
+                adecuarFilaValor(this);
+            });
+
+            $("form").on('change', ".entrega_input", function () {
+                calcularEntregaFacturas();
+            });
+
+            $(".monto_input").change(function () {
+                return calcularTotalValores();
+            });
+
+            // Register the click event handlers
+            $("#agregar_valor").click(function () {
+                return agregarValor(this, "valores");
+            });
+
+            $("form").on("click", ".delete", function () {
+                return borrarValor(this, "valores");
+            });
+
+            $('form').keypress(function (e) {
+                if (e == 13) {
+                    return false;
+                }
+            });
+
+            $('input').keypress(function (e) {
+                if (e.which == 13) {
+                    return false;
+                }
+            });
+
+            $("form").on("submit", function (e) {
+                e.preventDefault();
+                var form = $(e.target);
+                var total_entrega = parseFloat(form.find("#total_entregas_credito").text());
+                var total_valores = parseFloat(form.find("#total_valores").text());
+                if (total_entrega > total_valores) {
+                    alert("Lo valores ingreasados no cubren el total entregado.")
+                }
+                else if (total_entrega < total_valores) {
+                    var dialog = document.querySelector('dialog');
+                    if (!dialog.showModal) {
+                        dialogPolyfill.registerDialog(dialog);
+                    }
+                    dialog.showModal();
+                    dialog.querySelector('.close').addEventListener('click', function () {
+                        dialog.close();
+                    });
+                }
+                else {
+                    submitFormDef();
+                }
+            });
+
+        });
+
+    </script>
+{% endblock %}
+{% block container %}
+    <form method="POST" autocomplete="off" novalidate>{% csrf_token %}
+        <dialog class="mdl-dialog" style="width: 600px;">
+            <h4 class="mdl-dialog__title">Que desea hacer?</h4>
+            <div class="mdl-dialog__content">
+                <p>Existe una diferencia entre el valor entregado y el total de comprobantes, que desea hacer?</p>
+                {% for radio in reciboForm.que_hago_con_diferencia %}
+                    {% if forloop.first %}
+                        <label for="{{ radio.id_for_label }}" class="btn btn-primary active">
+                    {% else %}<label for="{{ radio.id_for_label }}" class="btn btn-primary">{% endif %}
+                {{ radio.tag }} {{ radio.choice_label }}
+                </label>
+                {% endfor %}
+                <div class="mdl-dialog__actions">
+                    <button type="button" onclick="submitFormDef()" class="mdl-button close">Aceptar</button>
+                    <button type="button" class="mdl-button close">Cancelar</button>
+                </div>
+            </div>
+        </dialog>
+        {{ reciboForm.credito_anterior }}
+        <div class="mdl-grid"></div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cel--6-col">
+                <div class="mdl-textfield mdl-js-textfield">{{ reciboForm.cliente }}{{ reciboForm.cliente.label_tag }}
+                    <script>
+                        var options = {
+                            url: function (phrase) {
+                                return "{% url "get_clientes_fk" %}" + "?ph=" + phrase;
+                            },
+
+                            getValue: "razon_social",
+
+                            list: {
+                                onChooseEvent: function () {
+                                    var value = $("#id_cliente_0").getSelectedItemData().pk;
+                                    $("#id_cliente_1").val(value).trigger("change");
+                                }
+                            }
+                        };
+
+                        $("#id_cliente_0").easyAutocomplete(options);
+                        $("#id_cliente_0").on("change", function () {
+                            if ($(this).val() == '') {
+                                $("#id_cliente_1").val("").trigger("change");
+                            }
+                        });
+                    </script>
+                </div>
+                {{ reciboForm.cliente.errors }}
+            </div>
+            <div class="mdl-cel--3-col">
+                <div class="mdl-textfield mdl-js-textfield">{{ reciboForm.fecha }}</div>
+            </div>
+            <div class="mdl-cel--3-col">
+                <div class="mdl-textfield mdl-js-textfield">
+                    <label id="numero_recibo">Nro: ________</label>
+                </div>
+            </div>
+        </div>
+        <div class="mdl-grid"></div>
+
+        <section class="mdl-grid mdl-shadow--2dp mdl-color--white" id="seccion_comprobantes"><!--COMPROBANTES-->
+            {{ cobroFormset.management_form }}
+            <div class="mdl-cell--12-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <h5>Comprobantes</h5>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <div id="seleccione_una_empresa">Seleccione una empresa para ver los comprobantes.</div>
+                        <div id="sin_comprobantes">La empresa seleccionada no presenta ventas pendientes de pago.</div>
+                        <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp" id="comprobantes-pendientes"
+                               width="100%">
+                            <thead>
+                            <tr id="encabezado_detalle_comprobantes">
+                                <th>Fecha</th>
+                                <th>Factura N°</th>
+                                <th>Total</th>
+                                <th>Saldo</th>
+                                <th>Entrega</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for formu in cobroFormset.forms %}
+                                <tr class="item">
+                                    {{ formu.id_factura }}
+                                    <td><label class="fecha_factura" id="id_cobros-0-fecha"></label></td>
+                                    <td><label class="numero_factura" id="id_cobros-0-nro_factura"></label></td>
+                                    <td><label class="total_factura moneda_pesos" id="id_cobros-0-total"></label></td>
+                                    <td><label class="saldo_factura moneda_pesos" id="id_cobros-0-saldo"></label></td>
+                                    <td>{{ formu.pagar.errors }}{{ formu.pagar }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr id="cobro-empty" style="display: none;">
+                                {{ cobroFormset.empty_form.id_factura }}
+                                <td><label class="fecha_factura" id="id_cobros-__prefix__-fecha">12/04/1986</label></td>
+                                <td><label class="numero_factura"
+                                           id="id_cobros-__prefix__-nro_factura">0003-00000045</label>
+                                </td>
+                                <td><label class="total_factura moneda_pesos"
+                                           id="id_cobros-__prefix__-total">1598.45</label></td>
+                                <td><label class="saldo_factura moneda_pesos"
+                                           id="id_cobros-__prefix__-saldo">1598.45</label></td>
+                                <td>{{ cobroFormset.empty_form.pagar }}</td>
+                            </tr>
+                            </tbody>
+                            <tfoot>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th>SUBTOTAL</th>
+                                <th><label class="moneda_pesos" id="total_facturas"></label></th>
+                                <th><label class="moneda_pesos" id="total_entregas"></label></th>
+                            </tr>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th>A CREDITO</th>
+                                <th><label class="a_credito moneda_pesos"></label></th>
+                                <th><label class="a_credito moneda_pesos"></label></th>
+                            </tr>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th>TOTAL</th>
+                                <th><label class="moneda_pesos" id="total_facturas_credito"></label></th>
+                                <th><label class="moneda_pesos" id="total_entregas_credito"></label></th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="mdl-grid"></div>
+        <section class="mdl-grid mdl-shadow--2dp mdl-color--white" id="seccion_valores">
+            {{ valoresFormset.management_form }}
+            <div class="mdl-cell--12-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <h5>Valores</h5>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <div class="bg-info" id="a_credito"></div>
+
+                        <table width="100%" style="margin: auto;" id="detalle_valores"
+                               class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
+                            <thead>
+                            <tr>
+                                <th>Tipo de valor</th>
+                                <th>Datos</th>
+                                <th>Monto</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for formu in valoresFormset.forms %}
+                                <tr class="item">
+                                    <td>{{ formu.tipo }}</td>
+                                    <td>
+                                        <div class="seccion_cheque minimize_cell_content">
+                                            <div style="display: flex;justify-content: space-between;">
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_numero }}{{ formu.cheque_numero.label_tag }}</div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_banco }}{{ formu.cheque_banco.label_tag }}</div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_fecha }} {{ formu.cheque_fecha.label_tag }}</div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_titular }}{{ formu.cheque_titular.label_tag }}</div>
+                                            </div>
+                                            <div style="display: flex;justify-content: space-between;">
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_cobro }}{{ formu.cheque_cobro.label_tag }}
+                                                </div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_cuit_titular }}{{ formu.cheque_cuit_titular.label_tag }}
+                                                </div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_paguese_a }}{{ formu.cheque_paguese_a.label_tag }}</div>
+                                                <div class="mdl-textfield mdl-js-textfield">
+                                                    {{ formu.cheque_domicilio_de_pago }}{{ formu.cheque_domicilio_de_pago.label_tag }}
+                                                </div>
+                                            </div>
+
+
+                                        </div>
+                                        <div class="seccion_transferencia minimize_cell_content">
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ formu.transferencia_banco_origen }}{{ formu.transferencia_banco_origen.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ formu.transferencia_cuenta_origen }}{{ formu.transferencia_cuenta_origen.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ formu.transferencia_numero_operacion }}{{ formu.transferencia_numero_operacion.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ formu.transferencia_cuenta_destino }}{{ formu.transferencia_cuenta_destino.label_tag }}</div>
+                                        </div>
+                                    </td>
+                                    <td>{{ formu.monto }}</td>
+                                    <td>
+                                        <button type="button" class="delete btn red darken-2"><i class="material-icons">remove</i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            <tr id="valor-empty" style="display: none;">
+                                <td>{{ valoresFormset.empty_form.tipo }}</td>
+                                <td>
+                                    <div class="seccion_cheque minimize_cell_content">
+                                        <div style="display: flex;justify-content: space-between;">
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_numero }}{{ valoresFormset.empty_form.cheque_numero.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_banco }}{{ valoresFormset.empty_form.cheque_banco.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_fecha }} {{ valoresFormset.empty_form.cheque_fecha.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_titular }}{{ valoresFormset.empty_form.cheque_titular.label_tag }}</div>
+                                        </div>
+                                        <div style="display: flex;justify-content: space-between;">
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_cobro }}{{ valoresFormset.empty_form.cheque_cobro.label_tag }}
+                                            </div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_cuit_titular }}{{ valoresFormset.empty_form.cheque_cuit_titular.label_tag }}
+                                            </div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_paguese_a }}{{ valoresFormset.empty_form.cheque_paguese_a.label_tag }}</div>
+                                            <div class="mdl-textfield mdl-js-textfield">
+                                                {{ valoresFormset.empty_form.cheque_domicilio_de_pago }}{{ valoresFormset.empty_form.cheque_domicilio_de_pago.label_tag }}
+                                            </div>
+                                        </div>
+
+
+                                    </div>
+                                    <div class="seccion_transferencia minimize_cell_content">
+                                        <div class="mdl-textfield mdl-js-textfield">
+                                            {{ valoresFormset.empty_form.transferencia_banco_origen }}{{ valoresFormset.empty_form.transferencia_banco_origen.label_tag }}</div>
+                                        <div class="mdl-textfield mdl-js-textfield">
+                                            {{ valoresFormset.empty_form.transferencia_cuenta_origen }}{{ valoresFormset.empty_form.transferencia_cuenta_origen.label_tag }}</div>
+                                        <div class="mdl-textfield mdl-js-textfield">
+                                            {{ valoresFormset.empty_form.transferencia_numero_operacion }}{{ valoresFormset.empty_form.transferencia_numero_operacion.label_tag }}</div>
+                                        <div class="mdl-textfield mdl-js-textfield">
+                                            {{ valoresFormset.empty_form.transferencia_cuenta_destino }}{{ valoresFormset.empty_form.transferencia_cuenta_destino.label_tag }}</div>
+                                    </div>
+                                </td>
+                                <td>{{ valoresFormset.empty_form.monto }}</td>
+                                <td>
+                                    <button type="button" class="delete btn red darken-2"><i class="material-icons">remove</i>
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <button type="button" id="agregar_valor" class="button"><i class="material-icons">add</i>
+                </button>
+                <h4><span>Total: </span><span id="total_valores" class="moneda_pesos">0.00</span></h4>
+
+            </div>
+        </section>
+    </form>
+{% endblock %}

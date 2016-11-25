@@ -1,0 +1,31 @@
+#detalle_factura .detalle-cantidad {
+    width: 70px;
+}
+
+#detalle_factura .detalle-precio_unitario {
+    width: 90px;
+}
+
+#detalle_factura .detalle-descuento {
+    width: 70px;
+}
+
+#detalle_factura .detalle-iva, #detalle_factura .detalle-linea {
+    width: 110px;
+}
+
+#detalle_factura .detalle-descripcion {
+    width: calc(100% - 220px);
+}
+
+#importe_subtotal::before, #importe_neto::before, #importe_iva::before, #importe_total::before {
+    content: "$  ";
+}
+
+dialog .total::before {
+    content: "$  ";
+}
+
+dialog #total-compuesto::before {
+    content: "TOTAL:  $  ";
+}

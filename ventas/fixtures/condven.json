@@ -1,0 +1,16 @@
+[
+  {
+    "model": "ventas.Condicion_venta",
+    "pk":1,
+    "fields" : {
+      "descripcion":"Contado"
+    }
+  },
+  {
+    "model": "ventas.Condicion_venta",
+    "pk":2,
+    "fields" : {
+      "descripcion": "Cuenta Corriente"
+    }
+  }
+]

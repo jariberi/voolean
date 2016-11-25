@@ -1,0 +1,52 @@
+[
+  {
+    "model": "core.FunctionHit",
+    "pk":1,
+    "fields" : {
+      "usuario":1,
+      "funcion":"BANCO",
+      "name":"listaBancos",
+      "hit":1
+    }
+  },
+  {
+    "model": "core.FunctionHit",
+    "pk":2,
+    "fields" : {
+      "usuario":1,
+      "funcion":"PERIO",
+      "name":"listaPeriodos",
+      "hit":1
+    }
+  },
+  {
+    "model": "core.FunctionHit",
+    "pk":3,
+    "fields" : {
+      "usuario":1,
+      "funcion":"TRANS",
+      "name":"listaTransportes",
+      "hit":1
+    }
+  },
+  {
+    "model": "core.FunctionHit",
+    "pk":4,
+    "fields" : {
+      "usuario":1,
+      "funcion":"CUENT",
+      "name":"listaCuentasBancarias",
+      "hit":1
+    }
+  },
+  {
+    "model": "core.FunctionHit",
+    "pk":5,
+    "fields" : {
+      "usuario":1,
+      "funcion":"ARTIC",
+      "name":"listaArticulos",
+      "hit":1
+    }
+  }
+]

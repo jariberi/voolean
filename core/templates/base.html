@@ -1,0 +1,67 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- Compiled and minified jQuery -->
+    <script src="{% static "js/jquery-1.11.3.min.js" %}"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="{% static "terceros/mdl-1.1.3/material.blue-deep_purple..min.css" %}">
+    <script defer src="{% static "terceros/mdl-1.1.3/material.min.js" %}"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static "css/base.css" %}">
+    <title>CRM - {% block siteTitle %}{% endblock %}</title>
+    <style>
+        .page-content {
+            width: 79%;
+            margin: auto;
+        }
+    </style>
+    {% block headExtras %}
+
+    {% endblock %}
+</head>
+<body>
+
+
+<div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer mdl-layout--fixed-header">
+    <header class="mdl-layout__header">
+        <div class="mdl-layout__header-row">
+            <div class="mdl-layout__title">{% block pageTitle %}{% endblock %}</div>
+            <div class="mdl-layout-spacer"></div>
+            {% block actionButtons %}{% endblock %}
+        </div>
+    </header>
+    <div class="mdl-layout__drawer">
+        <span class="mdl-layout-title">Comunes</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="{% url "listaBancos" %}">Bancos</a>
+            <a class="mdl-navigation__link" href="{% url "listaCuentasBancarias" %}">Cuentas Bancarias</a>
+            <a class="mdl-navigation__link" href="{% url "listaTransportes" %}">Transportes</a>
+            <a class="mdl-navigation__link" href="{% url "listaPeriodos" %}">Periodos</a>
+        </nav>
+        <span class="mdl-layout-title">Ventas</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="{% url "listaRubros" %}">Rubros</a>
+            <a class="mdl-navigation__link" href="{% url "listaSubrubros" %}">Subrubros</a>
+            <a class="mdl-navigation__link" href="{% url "listaLineas" %}">Lineas</a>
+{#            <a class="mdl-navigation__link" href="{% url "listaCondicionesVenta" %}">Cond. de Venta</a>#}
+            <a class="mdl-navigation__link" href="{% url "listaArticulos" %}">Artículos</a>
+            <a class="mdl-navigation__link" href="{% url "listaClientes" %}">Clientes</a>
+            <a class="mdl-navigation__link" href="{% url "listaVentas" %}">Ventas</a>
+            <a class="mdl-navigation__link" href="{% url "subdiarioIvaVentas" %}">Subdiario IVA Ventas</a>
+            <a class="mdl-navigation__link" href="{% url "listaCobros" %}">Cobros</a>
+        </nav>
+        <span class="mdl-layout-title">Compras</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="{% url "listaProveedores" %}">Proveedores</a>
+            <a class="mdl-navigation__link" href="{% url "listaCompras" %}">Compras</a>
+        </nav>
+    </div>
+    <main class="mdl-layout__content mdl-color--grey-100">
+        <div class="page-content">{% block container %}{% endblock %}</div>
+    </main>
+</div>
+
+</body>
+</html>

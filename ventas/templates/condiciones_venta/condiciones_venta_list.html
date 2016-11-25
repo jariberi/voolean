@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block headExtras %}
+    <script src="{% static "datatables/datatables.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "datatables/datatables.min.css" %}"/>
+    <title>Rubros - Administración</title>
+    <script>
+
+        $(document).ready(function () {
+            var tabla_condven = $('#condven').DataTable({
+                "dom": '<"row header_table grey lighten-4"<"col s2 offset-s1 center-content"f><"col s2 offset-s1 left-content"l><"col s1 left-content">>' +
+                '<"row"<"col s6 offset-s3"t>>' +
+                '<"row footer_table"<"col s12"ip>>',
+                "scrollY": 'calc(100vh - 300px)',
+                "pagingType": "simple",
+                "columnDefs": [
+                    {
+                        "targets": [1],
+                        "orderable": false,
+                        "searchable": false,
+                        "className": "action_column"
+                    },
+                    {
+                        "targets": [0],
+                        "className": ""
+                    }],
+                "ajax": "{% url "get_condiciones_venta_table" %}",
+                "order": [[0, "asc"]],
+                "orderMulti": false,
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/725b2a2115b/i18n/Spanish.json"
+                },
+                "processing": true,
+                "serverSide": true,
+                "search": {
+                    "caseInsensitive": true
+                }
+            });
+
+
+            tabla_condven.on('preInit', function (e, settings) {
+                var filter = $(".dataTables_filter");
+                var label = filter.find("label");
+                var input = filter.find("input");
+                input.appendTo(filter).attr("id", "filter_input").attr("type", "text");
+                label.attr("for", "filter_input").text("Buscar");
+                filter.addClass("input-field width_container").removeClass("dataTables_filter");
+                var length = $(".dataTables_length");
+                var label_length = length.find("label");
+                var input_length = length.find("select");
+                input_length.appendTo(length);
+                label_length.text("Mostrar Registros");
+                length.addClass("width_container").removeClass("dataTables_length");
+                $('select').material_select();
+                $(".header_table .col:last-child").html('<a class="waves-effect waves-light btn" href="{% url "nuevaCondicionVenta" %}">Nuevo</a>');
+            });
+        });
+
+    </script>
+
+{% endblock %}
+{% block title_page %}
+    CONDCIONES DE VENTA
+{% endblock %}
+{% block subtitle_page %}
+    Administración
+{% endblock %}
+{% block container %}
+    <table id="condven" class="table_mine">
+        <thead>
+        <tr>
+            <td>Descripción</td>
+            <td></td>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+{% endblock %}

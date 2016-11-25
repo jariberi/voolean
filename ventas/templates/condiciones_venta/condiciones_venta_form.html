@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title_page %}
+    CONDICIONES DE VENTA
+{% endblock %}
+{% block subtitle_page %}
+    Agregar/Editar
+{% endblock %}
+
+{% block container %}
+    <form method="post">{% csrf_token %}
+        {{ form.as_materialize }}
+        <script>
+            $(document).ready(function () {
+                $('select').material_select();
+            });
+        </script>
+        <div class="divider divider-margin-down"></div>
+        <div class="row">
+            <div class="col s12">
+                <button class="waves-effect waves-light btn" type="submit">Aceptar<i
+                        class="material-icons right">send</i></button>
+                <input class="waves-effect waves-light btn" type="reset" value="Deshacer cambios"/>
+                <input class="waves-effect waves-light btn" type="button" value="Cancelar" onclick="history.back()">
+            </div>
+        </div>
+    </form>
+{% endblock %}

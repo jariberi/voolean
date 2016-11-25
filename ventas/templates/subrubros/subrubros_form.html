@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+{% block pageTitle %}
+    SUBRUBROS
+{% endblock %}
+
+{% block siteTitle %}
+    SUBRUBROS
+{% endblock %}
+{
+
+{% block actionButtons %}
+    <button onclick='$("form").submit()' class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--accent"
+            type="submit"><i class="material-icons">send</i></button>
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-color--grey-400" onclick="history.back()"><i class="material-icons">clear</i></button>
+{% endblock %}
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+{% endblock %}
+
+{% block container %}
+    <form method="post" autocomplete="off" novalidate>{% csrf_token %}
+        {{ form.as_mdl }}
+    </form>
+    <script>
+        var options = {
+            url: function (phrase) {
+                return "{% url "get_rubros_fk" %}" + "?ph=" + phrase;
+            },
+
+            getValue: "nombre",
+
+            list: {
+                onChooseEvent: function () {
+                    var value = $("#id_rubro_0").getSelectedItemData().pk;
+                    $("#id_rubro_1").val(value).trigger("change");
+                }
+            }
+        };
+
+        $("#id_rubro_0").easyAutocomplete(options);
+        $("#id_rubro_0").on("change",function () {
+            if($(this).val()==''){
+                $("#id_rubro_1").val("").trigger("change");
+            }
+        });
+        $.validate({
+            lang: 'es',
+        });
+    </script>
+{% endblock %}

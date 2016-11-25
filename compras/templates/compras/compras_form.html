@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block headExtras %}
+    <script type="text/javascript"
+            src="{% static "terceros/easy-autocomplete-1.3.5/jquery.easy-autocomplete.min.js" %}"></script>
+    <link rel="stylesheet" href="{% static "css/eac-mdl.css" %}">
+    <link rel="stylesheet" href="https://getmdl.io/material.min.css">
+    <script src="{% static "js/app.js" %}"></script>
+{% endblock %}
+{% block pageTitle %}
+    COMPRAS
+    <script>
+        $(document).ready(function () {
+            //Variables globales
+            var subtotal_factura = 0;
+            var iva = new Array()
+            iva["10.5%"] = 0
+            iva["21%"] = 0
+            iva["27%"] = 0
+            var total = 0;
+            var es_b = false;
+
+
+            //FUNCIONES AUXILIARES
+
+            function actualizarIVAS() {
+                iva["10.5%"] = iva["21%"] = iva["27%"] = 0;
+                $("#tabla_detalle_compra .item").each(function () {
+                    var alic = $(this).find("[name*=iva] option:selected").text();
+                    iva[alic] = iva[alic] + parseFloat($(this).find("[name*=iva_valor]").val());
+                });
+            }
+
+            function actualizarTotalesFactura() {
+                var neto = 0;
+                $("#tabla_detalle_compra .detalle_compra").each(function () {
+                    neto = neto + parseFloat($(this).find("[name*=cantidad]").val()) * parseFloat($(this).find("[name*=precio_unitario]").val());
+                });
+                $("#importe_neto").text(redondear(neto, 2));
+                $("#importe_iva_105").text(iva["10.5%"]);
+                $("#importe_iva_21").text(iva["21%"]);
+                $("#importe_iva_27").text(iva["27%"]);
+                var exento = parseFloat($("#id_exento").val()) | 0;
+                var ing_brutos = parseFloat($("#id_ingresos_brutos").val()) | 0;
+                var perc_iva = parseFloat($("#id_percepcion_iva").val()) | 0;
+                var imp_interno = parseFloat($("#id_impuesto_interno").val()) | 0;
+                var redondeo = parseFloat($("#id_redondeo").val()) | 0;
+                var total = neto + iva["10.5%"] + iva["21%"] + iva["27%"] + exento + ing_brutos + perc_iva + imp_interno + redondeo;
+                $("#importe_total").text(redondear(total, 2));
+            }
+
+            //Paso como param la fila que se agrego o actualizo
+            function actualizarPTItemFactura(row) {
+                if ($(row).find("[name*=cantidad]").val() && $(row).find("[name*=precio_unitario]").val()) {
+                    var cantidad = parseFloat($(row).find("[name*=cantidad]").val())
+                    var pu = parseFloat($(row).find("[name*=precio_unitario]").val())
+                    var iva = parseFloat($(row).find("[name*=iva_valor]").val())
+                    $(row).find(".total").text(redondear((pu * cantidad) + iva, 2));
+                    actualizarTotalesFactura();
+                } else {
+                    $(row).find(".total").text("0.00");
+                }
+            }
+
+            function actualizarIVAItemFactura(row) {
+                if ($(row).find("[name*=cantidad]").val() && $(row).find("[name*=precio_unitario]").val()) {
+                    var alic = parseFloat($(row).find("[name*=iva]").val())
+                    var tot = parseFloat($(row).find("[name*=cantidad]").val()) * parseFloat($(row).find("[name*=precio_unitario]").val());
+                    var val = tot * alic / 100
+                    $(row).find("[name*=iva_valor]").val(redondear(val, 2));
+                    actualizarIVAS()
+                }
+                else {
+                    $(row).find("[name*=iva_valor]").val();
+                }
+
+            }
+
+            // Code adapted from http://djangosnippets.org/snippets/1389/
+            function updateElementIndex(el, prefix, ndx, neew) {
+                if (neew) {
+                    var id_regex = new RegExp('(' + prefix + '-__prefix__-)');
+                } else {
+                    var id_regex = new RegExp('(' + prefix + '-\\d+-)');
+                }
+                var replacement = prefix + '-' + ndx + '-';
+                if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex,
+                        replacement));
+                if (el.id) el.id = el.id.replace(id_regex, replacement);
+                if (el.name) el.name = el.name.replace(id_regex, replacement);
+            }
+
+            function deleteItemFactura(btn, prefix) {
+                var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+                if (formCount > 1) {
+                    // Delete the item/form
+                    var el_total = $(btn).parents('.detalle_compra').find('.total');
+                    var total_articulo = parseFloat(el_total.text().replace("$ ", ""));
+                    subtotal_factura = subtotal_factura - total_articulo;
+                    actualizarTotalesFactura();
+                    $(btn).parents('.detalle_compra').remove();
+                    var forms = $('.detalle_compra'); // Get all the forms
+                    // Update the total number of forms (1 less than before)
+                    $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
+                    var i = 0;
+                    // Go through the forms and set their indices, names and IDs
+                    for (formCount = forms.length; i < formCount; i++) {
+                        $(forms.get(i)).children().children().each(function () {
+                            updateElementIndex(this, prefix, i, false);
+                        });
+                    }
+                } // End if
+                else {
+                    alert("La factura debe contener al menos un item");
+                }
+                return false;
+            }
+
+
+            function addItemFactura(btn, prefix) {
+                var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+                if (formCount < 20) {
+                    var row = $("#detalle_compra-empty").clone()
+                        .removeAttr("style")
+                        .removeAttr("id")
+                        .addClass("detalle_compra")
+                        .insertAfter("#tabla_detalle_compra tbody tr:nth-last-child(2)")
+                        .slideDown(300);
+
+                    // Relabel or rename all the relevant bits
+                    $(row).children().children().each(function () {
+                        updateElementIndex(this, prefix, formCount, true);
+                    });
+
+                    //Acomodo los campos
+                    if ($("#id_tipo").val().match("C$")) {
+                        $(row).find("[name*=iva_alicuota]").val(0);
+                        $(row).find("[name*=iva_alicuota]").attr("disabled", true);
+                        $(row).find(".iva_monto_input").val(0.00);
+                        $(row).find(".iva_monto_input").attr("readonly", true);
+                    }
+
+                    // Update the total form count
+                    $("#id_" + prefix + "-TOTAL_FORMS").val(formCount + 1);
+                } // End if
+                else {
+                    alert("Solo se puede agregar 20 item por factura");
+                }
+            }
+
+
+            //ASOCIACIONES DE EVENTOS
+
+            //Evento de cambio de descuento
+            $("#id_punto_venta").on("change", function () {
+                $(this).val(("0000" + $(this).val()).slice(-4));
+            });
+
+            $("#id_numero").on("change", function () {
+                $(this).val(("00000000" + $(this).val()).slice(-8));
+            });
+
+
+            //Evento de cambio de cantidad de articulo
+            $("#tabla_detalle_compra").on("change", "[name*=cantidad], [name*=precio_unitario], [name*=iva]", function () {
+                actualizarIVAItemFactura($(this).parents(".detalle_compra"));
+                actualizarPTItemFactura($(this).parents(".detalle_compra"));
+            });
+
+            // Evento de cambio de seleccion de tipo de comprobante
+            $("#id_tipo").change(function () {
+                if ($(this).val().match("C$")) {
+                    $("#tabla_detalle_compra .detalle_compra").find("[name*=iva_alicuota]").each(function () {
+                        $(this).val(0);
+                        $(this).attr("disabled", true);
+                    });
+                    $("#tabla_detalle_compra .detalle_compra").find("[name*=iva_valor]").each(function () {
+                        $(this).val(0.00);
+                        $(this).attr("readonly", true);
+                    });
+                }
+                else {
+                    $("#tabla_detalle_compra .detalle_compra").find("[name*=iva_alicuota]").each(function () {
+                        $(this).attr("disabled", false)
+                    });
+                    $("#tabla_detalle_compra .detalle_compra").find("[name*=iva_valor]").each(function () {
+                        $(this).val("");
+                        $(this).attr("readonly", false);
+                    });
+                }
+                //return buscarPtoVtaYNumComp(this);
+            });
+
+            // Register the click event handlers
+            $("#add_item_factura").click(function () {
+                return addItemFactura(this, "detalle_compra");
+            });
+
+            $("#tabla_detalle_compra").on("click", ".delete", function () {
+                deleteItemFactura(this, "detalle_compra");
+            });
+
+            $("#id_exento, #id_ingresos_brutos, #id_percepcion_iva, #id_redondeo, #id_impuesto_interno").change(function () {
+                actualizarTotalesFactura();
+            });
+
+            //EJECUTABLES
+
+            $('form').keypress(function (e) {
+                if (e == 13) {
+                    return false;
+                }
+            });
+
+            $('input').keypress(function (e) {
+                if (e.which == 13) {
+                    return false;
+                }
+            });
+        });
+    </script>
+
+{% endblock %}
+
+{% block actionButtons %}
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored"
+            type="submit" form="comprobante-compra"><i class="material-icons">done</i></button>
+{% endblock %}
+
+{% block container %}
+    <form id="comprobante-compra" method="POST" autocomplete="off" novalidate>{% csrf_token %}
+        <div class="mdl-grid"></div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cell mdl-cell--12-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell mdl-cell--12-col">
+                        <h3>Cabecera</h3>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell mdl-cell--12-col">
+                        <div class="mdl-grid">
+                            <div class="mdl-cell mdl-cell--3-col">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.periodo }}
+                                    {{ compraForm.periodo.label_tag }}
+                                    <script>
+                                        var options = {
+                                            url: function (phrase) {
+                                                return "{% url "get_periodos_fk" %}" + "?ph=" + phrase;
+                                            },
+
+                                            getValue: "nombre",
+
+                                            list: {
+                                                onChooseEvent: function () {
+                                                    var value = $("#id_periodo_0").getSelectedItemData().pk;
+                                                    $("#id_periodo_1").val(value).trigger("change");
+                                                }
+                                            }
+                                        };
+
+                                        $("#id_periodo_0").easyAutocomplete(options);
+                                        $("#id_periodo_0").on("change", function () {
+                                            if ($(this).val() == '') {
+                                                $("#id_periodo_1").val("").trigger("change");
+                                            }
+                                        });
+                                    </script>
+                                </div>
+                            </div>
+                            <div class="mdl-cell mdl-cell--3-col">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.fecha }}
+                                    {{ compraForm.fecha.label_tag }}
+                                </div>
+                            </div>
+                            <div class="mdl-cell mdl-cell--2-col">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.tipo }}
+                                    {{ compraForm.tipo.label_tag }}
+                                </div>
+                            </div>
+                            <div class="mdl-cell mdl-cell--2-col">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.punto_venta }}
+                                    {{ compraForm.punto_venta.label_tag }}
+                                </div>
+                            </div>
+                            <div class="mdl-cell mdl-cell--2-col">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.numero }}
+                                    {{ compraForm.numero.label_tag }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mdl-grid">
+                            <div class="mdl-cell">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.proveedor }}
+                                    {{ compraForm.proveedor.label_tag }}
+                                    <script>
+                                        var options = {
+                                            url: function (phrase) {
+                                                return "{% url "get_proveedores_fk" %}" + "?ph=" + phrase;
+                                            },
+
+                                            getValue: "razon_social",
+
+                                            list: {
+                                                onChooseEvent: function () {
+                                                    var value = $("#id_proveedor_0").getSelectedItemData().pk;
+                                                    $("#id_proveedor_1").val(value).trigger("change");
+                                                }
+                                            }
+                                        };
+
+                                        $("#id_proveedor_0").easyAutocomplete(options);
+                                        $("#id_proveedor_0").on("change", function () {
+                                            if ($(this).val() == '') {
+                                                $("#id_proveedor_1").val("").trigger("change");
+                                            }
+                                        });
+                                    </script>
+                                </div>
+                            </div>
+                            <div class="mdl-cell">
+                                <div class="mdl-textfield mdl-js-textfield">
+                                    {{ compraForm.condicion_compra }}
+                                    {{ compraForm.condicion_compra.label_tag }}
+                                    <script>
+                                        var options = {
+                                            url: function (phrase) {
+                                                return "{% url "get_condiciones_compra_fk" %}" + "?ph=" + phrase;
+                                            },
+
+                                            getValue: "condicion",
+
+                                            list: {
+                                                onChooseEvent: function () {
+                                                    var value = $("#id_condicion_compra_0").getSelectedItemData().pk;
+                                                    $("#id_condicion_compra_1").val(value).trigger("change");
+                                                }
+                                            }
+                                        };
+
+                                        $("#id_condicion_compra_0").easyAutocomplete(options);
+                                        $("#id_condicion_compra_0").on("change", function () {
+                                            if ($(this).val() == '') {
+                                                $("#id_condicion_compra_1").val("").trigger("change");
+                                            }
+                                        });
+                                    </script>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mdl-grid"></div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cell--12-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        <h3>Detalle</h3>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell--12-col">
+                        {{ detalleCompraFormset.management_form }}
+                        <table id="tabla_detalle_compra" class="mdl-data-table mdl-js-data-table mdl-shadow--2dp highlight"
+                               width="100%">
+                            <thead>
+                            <tr id="encabezado_detalle_comprobante_compra">
+                                <th>Cantidad</th>
+                                <th>Detalle</th>
+                                <th>Precio Unitario</th>
+                                <th>Alic IVA</th>
+                                <th>Valor IVA</th>
+                                <th>Total</th>
+                                <th>Borrar</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for formu in detalleCompraFormset.forms %}
+                                <tr class="detalle_compra">
+                                    <td>{{ formu.cantidad }}</td>
+                                    <td>{{ formu.detalle }}</td>
+                                    <td>{{ formu.precio_unitario }}</td>
+                                    <td>{{ formu.iva_alicuota }}</td>
+                                    <td>{{ formu.iva_valor }}</td>
+                                    <td><label class="total">0.00</label></td>
+                                    <td>
+                                        <button type="button" class="delete">Borrar</button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            <tr id="detalle_compra-empty" style="display: none">
+                                <td>{{ detalleCompraFormset.empty_form.cantidad }}</td>
+                                <td>{{ detalleCompraFormset.empty_form.detalle }}</td>
+                                <td>{{ detalleCompraFormset.empty_form.precio_unitario }}</td>
+                                <td>{{ detalleCompraFormset.empty_form.iva_alicuota }}</td>
+                                <td>{{ detalleCompraFormset.empty_form.iva_valor }}</td>
+                                <td><label class="total">0.00</label></td>
+                                <td>
+                                    <button type="button" class="delete">Borrar</button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <p>
+                            <button id="add_item_factura" type="button" class="btn btn-primary">Agregar item</button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mdl-grid"></div>
+        <div class="mdl-grid mdl-shadow--2dp mdl-color--white">
+            <div class="mdl-cell--12-col">
+                <div class="mdl-grid">
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield"><span>Neto</span>
+                            <span class="moneda_pesos" id="importe_neto">0.00</span></div>
+                    </div>
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ compraForm.exento }}
+                            {{ compraForm.exento.label_tag }}</div>
+                    </div>
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ compraForm.impuesto_interno }}
+                            {{ compraForm.impuesto_interno.label_tag }}</div>
+                    </div>
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield"><span>IVA 10.5%</span>
+                            <span id="importe_iva_105" class="moneda_pesos">0.00</span></div>
+                    </div>
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ compraForm.ingresos_brutos }}
+                            {{ compraForm.ingresos_brutos.label_tag }}</div>
+                    </div>
+                    <div class="mdl-cell">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ compraForm.redondeo }}
+                            {{ compraForm.redondeo.label_tag }}</div>
+                    </div>
+
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield"><span>IVA 21%</span>
+                            <span id="importe_iva_21" class="moneda_pesos">0.00</span></div>
+                    </div>
+                    <div class="mdl-cell mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield">
+                            {{ compraForm.percepcion_iva }}
+                            {{ compraForm.percepcion_iva.label_tag }}</div>
+                    </div>
+
+                </div>
+                <div class="mdl-grid">
+                    <div class="mdl-cell mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield"><span>IVA 27%</span>
+                            <span class="moneda_pesos" id="importe_iva_27">0.00</span></div>
+                    </div>
+                    <div class="mdl-cell mdl-cell--6-col">
+                        <div class="mdl-textfield mdl-js-textfield"><span><strong>TOTAL</strong></span>
+                            <span class="moneda_pesos" id="importe_total"><strong>0.00</strong></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+{% endblock %}

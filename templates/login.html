@@ -1,0 +1,35 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html >
+  <head>
+    <meta charset="UTF-8">
+    <title>FacturoFacil - Login</title>
+    
+    
+        <link rel="stylesheet" href="{% static "css/login.css"%}">
+	
+    
+    
+    
+  </head>
+
+  <body>
+<div class="body"></div>
+		<div class="grad"></div>
+		<div class="header">
+			<div>Login <span>FacturoFacil</span></div>
+		</div>
+		<br>
+		
+      <form class="login" action="" method="post">
+        {% csrf_token %}
+				<input type="text" placeholder="Usuario" name="username"><br>
+				<input type="password" placeholder="Contraseña" name="password"><br>
+				<input type="submit" value="Login">
+				{% if form.errors %}
+      	<h2>Usuario o contraseña incorrectos. Reintente por favor.</h2>
+      	{% endif %}
+		</form>
+    
+  </body>
+</html>

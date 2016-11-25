@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title_page %}
+    SUBRUBROS
+{% endblock %}
+
+{% block actionButtons %}
+    <a class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored"
+       onclick="history.back()"><i class="material-icons">clear</i></a>
+    <a onclick="$('form').submit();" class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored"><i class="material-icons">done</i>
+    </a>
+{% endblock %}
+
+{% block container %}
+    <form action="" method="post">{% csrf_token %}
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col"><h3>Esta seguro de querer borrar esta venta?</h3>
+            </div>
+        </div>
+        <div class="mdl-grid">
+            <div class="mdl-cell--12-col"><h4>{{ object.info_completa }} del cliente {{ object.cliente.razon_social }}</h4></div>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load static %}
+{% block headExtras %}
+    <script src="https://cdn.datatables.net/1.10.12/js/jquery.dataTables.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.12/css/dataTables.material.min.css">
+    <script src="https://cdn.datatables.net/1.10.12/js/dataTables.material.min.js"></script>
+    <link rel="stylesheet" href="{% static "css/datatable-mdl-custom.css" %}">
+{% endblock %}
+{% block pageTitle %}
+    CLIENTES
+{% endblock %}
+{% block siteTitle %}
+Clientes
+{% endblock %}
+{% block actionButtons %}
+<a href="{% url "nuevoCliente" %}" class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+                <i class="material-icons">add</i>
+            </a>
+{% endblock %}
+{% block container %}
+    <table id="clientes" class="mdl-data-table" cellspacing="0" width="100%">
+        <thead>
+        <tr>
+            <td></td>
+            <td>CUIT</td>
+            <td>Razón Social</td>
+            <td>Localidad</td>
+            <td>Provincia</td>
+            <td>Teléfono</td>
+            <td style="width: 20px;"></td>
+            <td style="width: 20px;"></td>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        $(document).ready(function () {
+            var tabla_clientes = $('#clientes').DataTable({
+                "columnDefs": [
+                    {
+                        "targets": [0],
+                        "orderable": false,
+                        "data": null,
+                        "defaultContent": '<i class="material-icons">visibility</i>',
+                        "searchable": false,
+                        "className": "details-control"
+                    },
+                    {
+                        "targets": [6,7],
+                        "orderable": false,
+                        "className": "datatables-mdl--action-col"
+                    },
+                    {
+                        "targets": [0,1,2,3,4,5,6,7],
+                        "className": "mdl-data-table__cell--non-numeric"
+                    }],
+                "ajax": "{% url "get_clientes_table" %}",
+                "order": [[2, "asc"]],
+                "orderMulti": false,
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/725b2a2115b/i18n/Spanish.json"
+                },
+                "processing": true,
+                "serverSide": true,
+                "search": {
+                    "caseInsensitive": true
+                }
+            });
+             $('#clientes tbody').on('click', 'td.details-control', function () {
+                var tr = $(this).closest('tr');
+                var row = tabla_clientes.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                    $(this).html('<i class="material-icons">visibility</i>');
+                }
+                else {
+                    // Open this row
+                    row.child(row.data()[0]).show().addClass("mdl-data-table__cell--non-numeric");
+                    $(this).html('<i class="material-icons">visibility_off</i>');
+                }
+            });
+        });
+    </script>
+{% endblock %}
