@@ -14,21 +14,19 @@ __author__ = "Jorge Riberi (jariberi@gmail.com)"
 import email, os, sys, warnings
 from php import date
 from pysimplesoap.client import SimpleXMLElement
-from base import inicializar_y_capturar_excepciones, WebServiceAFIP, exception_info
+from base import WebServiceAFIP
 
 try:
     from M2Crypto import BIO, Rand, SMIME, SSL
 except ImportError:
-    ex = exception_info()
     warnings.warn("No es posible importar M2Crypto (OpenSSL)")
-    warnings.warn(ex['msg'])  # revisar instalación y DLLs de OpenSSL
     BIO = Rand = SMIME = SSL = None
     # utilizar alternativa (ejecutar proceso por separado)
     from subprocess import Popen, PIPE
     from base64 import b64encode
 
 # Constantes (si se usa el script de linea de comandos)
-CERT = CERT_FILE_TEST if voolean.settings.DEBUG == True else CERT_FILE_PROD  # El certificado X.509 obtenido de Seg. Inf.
+CERT = CERT_FILE_TEST if voolean.settings.DEBUG is True else CERT_FILE_PROD  # El certificado X.509 obtenido de Seg. Inf.
 PRIVATEKEY = PRIVATE_KEY_FILE  # La clave privada del certificado CERT
 SERVICE = "wsfe"  # El nombre del web service al que se le pide el TA
 
@@ -38,8 +36,6 @@ WSAAURL_TEST = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms?wsdl"  # homol
 
 # Verificación del web server remoto, necesario para verificar canal seguro
 CACERT = "conf/afip_ca_info.crt"  # WSAA CA Cert (Autoridades de Confiaza)
-
-DEBUG = False
 
 
 # No debería ser necesario modificar nada despues de esta linea
@@ -119,26 +115,21 @@ class WSAA(WebServiceAFIP):
     "Interfaz para el WebService de Autenticación y Autorización"
 
     def __init__(self, reintentos=1, produccion=False):
-        WebServiceAFIP.__init__(self, reintentos)
-        self.produccion = produccion
+        WebServiceAFIP.__init__(self, reintentos, produccion)
 
-    @inicializar_y_capturar_excepciones
     def CreateTRA(self, service="wsfe", ttl=2400):
         "Crear un Ticket de Requerimiento de Acceso (TRA)"
         return create_tra(service, ttl)
 
-    @inicializar_y_capturar_excepciones
     def SignTRA(self, tra, cert, privatekey, passphrase=""):
         "Firmar el TRA y devolver CMS"
         return sign_tra(str(tra), cert.encode('latin1'), privatekey.encode('latin1'), passphrase.encode("utf8"))
 
-    @inicializar_y_capturar_excepciones
     def Conectar(self):
         wsdl = WSAAURL_PROD if self.produccion else WSAAURL_TEST
         return WebServiceAFIP.Conectar(self, wsdl=wsdl, proxy="", wrapper=None, cacert=None, timeout=30,
                                        soap_server=None)
 
-    @inicializar_y_capturar_excepciones
     def LoginCMS(self, cms):
         "Obtener ticket de autorización (TA)"
         results = self.client.loginCms(in0=str(cms))
@@ -150,7 +141,7 @@ class WSAA(WebServiceAFIP):
         return ta_xml
 
 
-def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):
+def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: Factura electronica
     try:
         permiso = AFIP_Datos_Autenticacion.objects.get(produccion=produccion)
     except AFIP_Datos_Autenticacion.DoesNotExist:
@@ -168,7 +159,8 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):
                 return wsaa
             else:
                 return None
-        except:
+        except e:
+            print e
             return None
     if permiso.expiration > now():
         wsaa = WSAA()

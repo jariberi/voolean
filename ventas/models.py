@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import re
+
 import django
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from core.models import Periodo, Transporte, BaseModel
@@ -243,7 +246,8 @@ class Cliente(BaseModel):
     telefono = models.CharField(max_length=60, help_text="Telefono de contacto del cliente", blank=True)
     fax = models.CharField(max_length=60, help_text="Fax del cliente", blank=True)
     email = models.EmailField(max_length=254, blank=True)
-    cuit = models.CharField(max_length=13, unique=True)
+    cuit = models.CharField(max_length=13, blank=True)
+    dni = models.CharField(max_length=8, blank=True)
     codigo_iva = models.CharField(max_length=25, blank=True)
     cond_iva = models.CharField(max_length=40, blank=True, choices=COND_IVA_CHOICES)
     codigo_ingresos_brutos = models.CharField(max_length=15, blank=True)
@@ -303,14 +307,6 @@ class Cliente(BaseModel):
         if recibos['total']:
             ret -= recibos['total']
         return ret
-
-    '''
-    @param desde: Date con la fecha desde para los datos del resumen de cuenta
-    @param hasta: Date con la fecha hasta para los datos del resumen de cuenta
-    '''
-
-    def resumen_cuenta(self, desde, hasta):
-        ventas_totales = Venta.objects.filter(fecha__range=(desde, hasta), aprobado=True)
 
 
 class Venta(models.Model):
@@ -484,7 +480,6 @@ class Item_almacenados(models.Model):
                                                 null=True)
     renglon = models.IntegerField()
 
-
     def descuento_value(self):
         if self.venta.tipo.endswith('B'):
             return self.articulo._precio_venta_iva_inc() * self.descuento / 100
@@ -494,7 +489,7 @@ class Item_almacenados(models.Model):
     def subtotal(self):
         if self.venta.tipo.endswith('B'):
             return self.cantidad * (
-            self.articulo._precio_venta_iva_inc() - (self.articulo._precio_venta_iva_inc() * self.descuento / 100))
+                self.articulo._precio_venta_iva_inc() - (self.articulo._precio_venta_iva_inc() * self.descuento / 100))
         else:
             return self.cantidad * (
                 self.articulo._precio_venta() - (self.articulo._precio_venta() * self.descuento / 100))
@@ -555,7 +550,6 @@ class Item_compuesto(models.Model):
     comprobante_relacionado = models.ForeignKey(Venta, related_name='compuesto_comprobante_relacionado', blank=True,
                                                 null=True)
     renglon = models.IntegerField()
-
 
     def precio_unitario(self):
         pu = reduce(lambda x, y: x + y, [item.subtotal() for item in

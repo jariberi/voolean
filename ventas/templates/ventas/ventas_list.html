@@ -62,15 +62,24 @@
                 $(this).hide();
                 $(this).parents("td").html('<div class="mdl-spinner mdl-spinner--single-color mdl-js-spinner is-active"></div>');
                 $.getJSON($(this).attr("href"), function (data) {
+                    console.log(data);
                     if (data.result == 'OK') {
                         $("dialog#aprobar #result").text('Comprobante aprobado');
                         $("dialog#aprobar #data").html('CAE:' + data.cae + '<br>Vencimiento:' + data.venc);
                         $("dialog#aprobar #obs").html(data.obs);
                     }
                     else if (data.result == 'ER') {
-                        $("dialog#aprobar #result").text('Comprobante rechazada');
-                        $("dialog#aprobar #data").text('ERROR:' + data.err);
-                        $("dialog#aprobar #obs").html(data.obs);
+                        $("dialog#aprobar #result").text('Comprobante rechazado');
+                        var errors = "";
+                        data.err.forEach(function (er) {
+                            errors += er.code + " - " + er.msg
+                        });
+                        var obss = "";
+                        $("dialog #data").html('<p>ERROR: ' + errors + '</p>');
+                        data.obs.forEach(function (obs) {
+                            obss += obs.code + " - " + obs.msg
+                        });
+                        $("dialog #data").html('<p>OBS: ' + obss + '</p>');
                     }
                     var dialog = document.querySelector('dialog#aprobar');
                     if (!dialog.showModal) {
@@ -87,7 +96,7 @@
                 event.preventDefault();
                 var url_pdf = $(this).attr("href");
                 $("dialog#obtener_comprobante .mdl-dialog__title").text('Comprobante');
-                $("dialog#obtener_comprobante .mdl-dialog__content").html('<iframe style="width:100%; height:65vh;" src="'+url_pdf+'"></iframe>');
+                $("dialog#obtener_comprobante .mdl-dialog__content").html('<iframe style="width:100%; height:65vh;" src="' + url_pdf + '"></iframe>');
                 var dialog = document.querySelector('dialog#obtener_comprobante');
                 if (!dialog.showModal) {
                     dialogPolyfill.registerDialog(dialog);

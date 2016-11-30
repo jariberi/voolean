@@ -10,7 +10,7 @@ from afip_ws.wsaa import obtener_o_crear_permiso
 
 __author__ = "Jorge Riberi <jariberi@gmail.com>"
 
-from base import inicializar_y_capturar_excepciones, WebServiceAFIP
+from base import WebServiceAFIP
 
 LANZAR_EXCEPCIONES = False  # valor por defecto: True
 WSFEV1_URL_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL"
@@ -20,9 +20,7 @@ WSFEV1_URL_TEST = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL"
 class WSFEv1(WebServiceAFIP):
     "Interfaz para el WebService de Factura Electrónica Version 1 - 2.5"
     # Variables globales para WebServiceAFIP:
-    Reprocesar = True  # recuperar automaticamente CAE emitidos
     factura = None
-    facturas = None
 
     def __init__(self, reintentos=1, produccion=False):
         WebServiceAFIP.__init__(self, reintentos)
@@ -33,9 +31,10 @@ class WSFEv1(WebServiceAFIP):
             permiso = obtener_o_crear_permiso(produccion=produccion)
             self.Token = permiso.Token
             self.Sign = permiso.Sign
+        self.Errores = self.Observaciones = self.Eventos = []
 
-    def inicializar(self):
-        WebServiceAFIP.inicializar(self)
+    def resetearOperacion(self):
+        WebServiceAFIP.resetearOperacion(self)
         self.AppServerStatus = self.DbServerStatus = self.AuthServerStatus = None
         self.Resultado = self.Motivo = self.Reproceso = ''
         self.LastID = self.LastCMP = self.CAE = self.CAEA = self.Vencimiento = ''
@@ -59,13 +58,11 @@ class WSFEv1(WebServiceAFIP):
             events = ret['Events']
             self.Eventos = ['%s: %s' % (evt['Evt']['Code'], evt['Evt']['Msg']) for evt in events]
 
-    @inicializar_y_capturar_excepciones
     def Conectar(self):
         wsdl = WSFEV1_URL_PROD if self.produccion else WSFEV1_URL_TEST
         return WebServiceAFIP.Conectar(self, wsdl=wsdl, proxy="", wrapper=None, cacert=None, timeout=30,
                                        soap_server=None)
 
-    @inicializar_y_capturar_excepciones
     def Dummy(self):
         "Obtener el estado de los servidores de la AFIP"
         result = self.client.FEDummy()['FEDummyResult']
@@ -156,7 +153,6 @@ class WSFEv1(WebServiceAFIP):
 
     # metodos principales para llamar remotamente a AFIP:
 
-    @inicializar_y_capturar_excepciones
     def CAESolicitar(self):
         f = self.factura
         FeCAEReq = {
@@ -218,46 +214,22 @@ class WSFEv1(WebServiceAFIP):
         ret = self.client.FECAESolicitar(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
             FeCAEReq=FeCAEReq)
-
+        print "!!!!!!!!!!!!RET:" + str(ret)
         result = ret['FECAESolicitarResult']
         if 'FeCabResp' in result:
             fecabresp = result['FeCabResp']
             fedetresp = result['FeDetResp'][0]['FECAEDetResponse']
-
-            # Reprocesar en caso de error (recuperar CAE emitido anteriormente)
-            if self.Reprocesar and ('Errors' in result or 'Observaciones' in fedetresp):
-                for error in result.get('Errors', []) + fedetresp.get('Observaciones', []):
-                    err_code = str(error.get('Err', error.get('Obs'))['Code'])
-                    if fedetresp['Resultado'] == 'R' and err_code == '10016':
-                        # guardo los mensajes xml originales
-                        xml_request = self.client.xml_request
-                        xml_response = self.client.xml_response
-                        cae = self.CompConsultar(f['tipo_cbte'], f['punto_vta'], f['cbt_desde'], reproceso=True)
-                        if cae and self.EmisionTipo == 'CAE':
-                            self.Reproceso = 'S'
-                            return cae
-                        self.Reproceso = 'N'
-                        # reestablesco los mensajes xml originales
-                        self.client.xml_request = xml_request
-                        self.client.xml_response = xml_response
-
+            if 'Errors' in result or 'Observaciones' in fedetresp:
+                for error in result.get('Errors', []):
+                    self.Errores.append({'code': error['Err']['Code'], 'msg': error['Err']['Msg'].encode('latin-1')})
+                for obs in fedetresp.get('Observaciones', []):
+                    print obs
+                    self.Observaciones.append({'code': obs['Obs']['Code'], 'msg': obs['Obs']['Msg'].encode('latin-1')})
             self.Resultado = fecabresp['Resultado']
-            # Obs:
-            for obs in fedetresp.get('Observaciones', []):
-                self.Observaciones.append("%(Code)s: %(Msg)s" % (obs['Obs']))
-            self.Obs = '\n'.join(self.Observaciones)
             self.CAE = fedetresp['CAE'] and str(fedetresp['CAE']) or ""
-            self.EmisionTipo = 'CAE'
-            self.Vencimiento = fedetresp['CAEFchVto']
-            self.FechaCbte = fedetresp.get('CbteFch', "")  # .strftime("%Y/%m/%d")
-            self.CbteNro = fedetresp.get('CbteHasta', 0)  # 1L
-            self.PuntoVenta = fecabresp.get('PtoVta', 0)  # 4000
-            self.CbtDesde = fedetresp.get('CbteDesde', 0)
-            self.CbtHasta = fedetresp.get('CbteHasta', 0)
-        self.__analizar_errores(result)
+            self.Vencimiento = fedetresp['CAEFchVto'] or ""
         return self.CAE
 
-    @inicializar_y_capturar_excepciones
     def CompTotXRequest(self):
         ret = self.client.FECompTotXRequest(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
@@ -266,7 +238,6 @@ class WSFEv1(WebServiceAFIP):
         result = ret['FECompTotXRequestResult']
         return result['RegXReq']
 
-    @inicializar_y_capturar_excepciones
     def CompUltimoAutorizado(self, tipo_cbte, punto_vta):
         ret = self.client.FECompUltimoAutorizado(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
@@ -279,10 +250,7 @@ class WSFEv1(WebServiceAFIP):
         self.__analizar_errores(result)
         return self.CbteNro is not None and str(self.CbteNro) or ''
 
-    @inicializar_y_capturar_excepciones
-    def CompConsultar(self, tipo_cbte, punto_vta, cbte_nro, reproceso=False):
-        difs = []  # si hay reproceso, verifico las diferencias con AFIP
-
+    def CompConsultar(self, tipo_cbte, punto_vta, cbte_nro):
         ret = self.client.FECompConsultar(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
             FeCompConsReq={
@@ -294,147 +262,9 @@ class WSFEv1(WebServiceAFIP):
         result = ret['FECompConsultarResult']
         if 'ResultGet' in result:
             resultget = result['ResultGet']
+            return resultget
 
-            if reproceso:
-                # verifico los campos registrados coincidan con los enviados:
-                f = self.factura
-                verificaciones = {
-                    'Concepto': f['concepto'],
-                    'DocTipo': f['tipo_doc'],
-                    'DocNro': f['nro_doc'],
-                    'CbteTipo': f['tipo_cbte'],
-                    'CbteDesde': f['cbt_desde'],
-                    'CbteHasta': f['cbt_hasta'],
-                    'CbteFch': f['fecha_cbte'],
-                    'ImpTotal': f['imp_total'] and float(f['imp_total']) or 0.0,
-                    'ImpTotConc': f['imp_tot_conc'] and float(f['imp_tot_conc']) or 0.0,
-                    'ImpNeto': f['imp_neto'] and float(f['imp_neto']) or 0.0,
-                    'ImpOpEx': f['imp_op_ex'] and float(f['imp_op_ex']) or 0.0,
-                    'ImpTrib': f['imp_trib'] and float(f['imp_trib']) or 0.0,
-                    'ImpIVA': f['imp_iva'] and float(f['imp_iva']) or 0.0,
-                    'FchServDesde': f.get('fecha_serv_desde'),
-                    'FchServHasta': f.get('fecha_serv_hasta'),
-                    'FchVtoPago': f.get('fecha_venc_pago'),
-                    'MonId': f['moneda_id'],
-                    'MonCotiz': float(f['moneda_ctz']),
-                    'CbtesAsoc': [
-                        {'CbteAsoc': {
-                            'Tipo': cbte_asoc['tipo'],
-                            'PtoVta': cbte_asoc['pto_vta'],
-                            'Nro': cbte_asoc['nro']}}
-                        for cbte_asoc in f['cbtes_asoc']],
-                    'Tributos': [
-                        {'Tributo': {
-                            'Id': tributo['tributo_id'],
-                            'Desc': tributo['desc'],
-                            'BaseImp': float(tributo['base_imp']),
-                            'Alic': float(tributo['alic']),
-                            'Importe': float(tributo['importe']),
-                        }}
-                        for tributo in f['tributos']],
-                    'Iva': [
-                        {'AlicIva': {
-                            'Id': iva['iva_id'],
-                            'BaseImp': float(iva['base_imp']),
-                            'Importe': float(iva['importe']),
-                        }}
-                        for iva in f['iva']],
-                }
-                if difs:
-                    print "Diferencias:", difs
-                    self.log("Diferencias: %s" % difs)
-            else:
-                # guardo los datos de AFIP (reconstruyo estructura interna)
-                self.factura = {
-                    'concepto': resultget.get('Concepto'),
-                    'tipo_doc': resultget.get('DocTipo'),
-                    'nro_doc': resultget.get('DocNro'),
-                    'tipo_cbte': resultget.get('CbteTipo'),
-                    'punto_vta': resultget.get('PtoVta'),
-                    'cbt_desde': resultget.get('CbteDesde'),
-                    'cbt_hasta': resultget.get('CbteHasta'),
-                    'fecha_cbte': resultget.get('CbteFch'),
-                    'imp_total': resultget.get('ImpTotal'),
-                    'imp_tot_conc': resultget.get('ImpTotConc'),
-                    'imp_neto': resultget.get('ImpNeto'),
-                    'imp_op_ex': resultget.get('ImpOpEx'),
-                    'imp_trib': resultget.get('ImpTrib'),
-                    'imp_iva': resultget.get('ImpIVA'),
-                    'fecha_serv_desde': resultget.get('FchServDesde'),
-                    'fecha_serv_hasta': resultget.get('FchServHasta'),
-                    'fecha_venc_pago': resultget.get('FchVtoPago'),
-                    'moneda_id': resultget.get('MonId'),
-                    'moneda_ctz': resultget.get('MonCotiz'),
-                    'cbtes_asoc': [
-                        {
-                            'tipo': cbte_asoc['CbteAsoc']['Tipo'],
-                            'pto_vta': cbte_asoc['CbteAsoc']['PtoVta'],
-                            'nro': cbte_asoc['CbteAsoc']['Nro']}
-                        for cbte_asoc in resultget.get('CbtesAsoc', [])],
-                    'tributos': [
-                        {
-                            'tributo_id': tributo['Tributo']['Id'],
-                            'desc': tributo['Tributo']['Desc'],
-                            'base_imp': tributo['Tributo'].get('BaseImp'),
-                            'alic': tributo['Tributo'].get('Alic'),
-                            'importe': tributo['Tributo']['Importe'],
-                        }
-                        for tributo in resultget.get('Tributos', [])],
-                    'iva': [
-                        {
-                            'iva_id': iva['AlicIva']['Id'],
-                            'base_imp': iva['AlicIva']['BaseImp'],
-                            'importe': iva['AlicIva']['Importe'],
-                        }
-                        for iva in resultget.get('Iva', [])],
-                    'opcionales': [
-                        {
-                            'opcional_id': obs['Opcional']['Id'],
-                            'valor': obs['Opcional']['Valor'],
-                        }
-                        for obs in resultget.get('Opcionales', [])],
-                    'cae': resultget.get('CodAutorizacion'),
-                    'resultado': resultget.get('Resultado'),
-                    'fch_venc_cae': resultget.get('FchVto'),
-                    'obs': [
-                        {
-                            'code': obs['Obs']['Code'],
-                            'msg': obs['Obs']['Msg'],
-                        }
-                        for obs in resultget.get('Observaciones', [])],
-                }
 
-            self.FechaCbte = resultget['CbteFch']  # .strftime("%Y/%m/%d")
-            self.CbteNro = resultget['CbteHasta']  # 1L
-            self.PuntoVenta = resultget['PtoVta']  # 4000
-            self.Vencimiento = resultget['FchVto']  # .strftime("%Y/%m/%d")
-            self.ImpTotal = str(resultget['ImpTotal'])
-            cod_aut = resultget['CodAutorizacion'] and str(resultget['CodAutorizacion']) or ''  # 60423794871430L
-            self.Resultado = resultget['Resultado']
-            self.CbtDesde = resultget['CbteDesde']
-            self.CbtHasta = resultget['CbteHasta']
-            self.ImpTotal = resultget['ImpTotal']
-            self.ImpNeto = resultget['ImpNeto']
-            self.ImptoLiq = self.ImpIVA = resultget['ImpIVA']
-            self.ImpOpEx = resultget['ImpOpEx']
-            self.ImpTrib = resultget['ImpTrib']
-            self.EmisionTipo = resultget['EmisionTipo']
-            if self.EmisionTipo == 'CAE':
-                self.CAE = cod_aut
-            elif self.EmisionTipo == 'CAEA':
-                self.CAEA = cod_aut
-            # Obs:
-            for obs in resultget.get('Observaciones', []):
-                self.Observaciones.append("%(Code)s: %(Msg)s" % (obs['Obs']))
-            self.Obs = '\n'.join(self.Observaciones)
-
-        self.__analizar_errores(result)
-        if not difs:
-            return self.CAE or self.CAEA
-        else:
-            return ''
-
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposCbte(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de Comprobantes"
         ret = self.client.FEParamGetTiposCbte(
@@ -444,7 +274,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['CbteTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposConcepto(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de Conceptos"
         ret = self.client.FEParamGetTiposConcepto(
@@ -454,7 +283,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['ConceptoTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposDoc(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de Documentos"
         ret = self.client.FEParamGetTiposDoc(
@@ -464,7 +292,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['DocTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposIva(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de Alícuotas"
         ret = self.client.FEParamGetTiposIva(
@@ -474,7 +301,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['IvaTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposMonedas(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Monedas"
         ret = self.client.FEParamGetTiposMonedas(
@@ -484,7 +310,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['Moneda']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposOpcional(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de datos opcionales"
         ret = self.client.FEParamGetTiposOpcional(
@@ -494,7 +319,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['OpcionalTipo']).replace("\t", sep)
                 for p in res.get('ResultGet', [])]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposTributos(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Tipos de Tributos"
         "Este método permite consultar los tipos de tributos habilitados en este WS"
@@ -505,7 +329,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s\t%(FchDesde)s\t%(FchHasta)s" % p['TributoTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetTiposPaises(self, sep="|"):
         "Recuperador de valores referenciales de códigos de Paises"
         "Este método permite consultar los tipos de tributos habilitados en este WS"
@@ -516,7 +339,6 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Id)s\t%(Desc)s" % p['PaisTipo']).replace("\t", sep)
                 for p in res['ResultGet']]
 
-    @inicializar_y_capturar_excepciones
     def ParamGetCotizacion(self, moneda_id):
         "Recuperador de cotización de moneda"
         ret = self.client.FEParamGetCotizacion(
@@ -527,7 +349,6 @@ class WSFEv1(WebServiceAFIP):
         res = ret['FEParamGetCotizacionResult']['ResultGet']
         return str(res.get('MonCotiz', ""))
 
-    @inicializar_y_capturar_excepciones
     def ParamGetPtosVenta(self, sep="|"):
         "Recuperador de valores referenciales Puntos de Venta registrados"
         ret = self.client.FEParamGetPtosVenta(
@@ -537,7 +358,3 @@ class WSFEv1(WebServiceAFIP):
         return [(u"%(Nro)s\tEmisionTipo:%(EmisionTipo)s\tBloqueado:%(Bloqueado)s\tFchBaja:%(FchBaja)s" % p[
             'PtoVenta']).replace("\t", sep)
                 for p in res.get('ResultGet', [])]
-
-
-def p_assert_eq(a, b):
-    print a, a == b and '==' or '!=', b

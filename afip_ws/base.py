@@ -3,8 +3,6 @@ from afip_ws.soap import SoapClient
 
 __author__ = "Jorge Riberi <jariberi@gmail.com>"
 
-import functools
-import socket
 import sys
 import os
 import stat
@@ -15,7 +13,7 @@ from urllib import urlencode
 import mimetools, mimetypes
 from Cookie import SimpleCookie
 
-from pysimplesoap.client import SimpleXMLElement, SoapFault, parse_proxy, set_http_wrapper
+from pysimplesoap.client import parse_proxy, set_http_wrapper
 
 try:
     import json
@@ -55,130 +53,19 @@ try:
 except:
     print "para soporte de WebClient debe instalar httplib2"
 
-DEBUG = False
-
-
-# Funciones para manejo de errores:
-
-
-def exception_info(current_filename=None, index=-1):
-    "Analizar el traceback y armar un dict con la info amigable user-friendly"
-    # guardo el traceback original (por si hay una excepción):
-    info = sys.exc_info()  # exc_type, exc_value, exc_traceback
-    # importante: no usar unpacking porque puede causar memory leak
-    if not current_filename:
-        # genero un call stack para ver quien me llamó y limitar la traza:
-        # advertencia: esto es necesario ya que en py2exe no tengo __file__
-        try:
-            raise ZeroDivisionError
-        except ZeroDivisionError:
-            f = sys.exc_info()[2].tb_frame.f_back
-        current_filename = os.path.normpath(os.path.abspath(f.f_code.co_filename))
-
-    # extraer la última traza del archivo solicitado:
-    # (útil para no alargar demasiado la traza con lineas de las librerías)
-    ret = {'filename': "", 'lineno': 0, 'function_name': "", 'code': ""}
-    try:
-        for (filename, lineno, fn, text) in traceback.extract_tb(info[2]):
-            if os.path.normpath(os.path.abspath(filename)) == current_filename:
-                ret = {'filename': filename, 'lineno': lineno,
-                       'function_name': fn, 'code': text}
-    except Exception, e:
-        pass
-    # obtengo el mensaje de excepcion tal cual lo formatea python:
-    # (para evitar errores de encoding)
-    try:
-        ret['msg'] = traceback.format_exception_only(*info[0:2])[0]
-    except:
-        ret['msg'] = '<no disponible>'
-    # obtener el nombre de la excepcion (ej. "NameError")
-    try:
-        ret['name'] = info[0].__name__
-    except:
-        ret['name'] = 'Exception'
-    # obtener la traza formateada como string:
-    try:
-        tb = traceback.format_exception(*info)
-        ret['tb'] = ''.join(tb)
-    except:
-        ret['tb'] = ""
-    return ret
-
-
-def inicializar_y_capturar_excepciones(func):
-    "Decorador para inicializar y capturar errores (version para webservices)"
-
-    @functools.wraps(func)
-    def capturar_errores_wrapper(self, *args, **kwargs):
-        try:
-            # inicializo (limpio variables)
-            self.errores = []  # listas de dict para usar en python
-            self.observaciones = []
-            self.Eventos = []
-            self.Traceback = self.Excepcion = ""
-            self.ErrCode = self.ErrMsg = self.Obs = ""
-            # limpio variables especificas del webservice:
-            self.inicializar()
-            # actualizo los parámetros
-            kwargs.update(self.params_in)
-            # limpio los parámetros
-            self.params_in = {}
-            self.params_out = {}
-            # llamo a la función (con reintentos)
-            retry = self.reintentos + 1
-            while retry:
-                try:
-                    retry -= 1
-                    return func(self, *args, **kwargs)
-                except socket.error, e:
-                    if e[0] not in (10054, 10053):
-                        # solo reintentar si el error es de conexión
-                        # (10054, 'Connection reset by peer')
-                        # (10053, 'Software caused connection abort')
-                        raise
-                    else:
-                        if DEBUG: print e, "Reintentando..."
-                        self.log(exception_info().get("msg", ""))
-
-        except SoapFault, e:
-            # guardo destalle de la excepción SOAP
-            self.ErrCode = unicode(e.faultcode)
-            self.ErrMsg = unicode(e.faultstring)
-            self.Excepcion = u"%s: %s" % (e.faultcode, e.faultstring,)
-            if self.LanzarExcepciones:
-                raise
-        except Exception, e:
-            ex = exception_info()
-            self.Traceback = ex.get("tb", "")
-            try:
-                self.Excepcion = ex.get("msg", "")
-            except:
-                self.Excepcion = u"<no disponible>"
-            if self.LanzarExcepciones:
-                raise
-            else:
-                self.ErrMsg = self.Excepcion
-        finally:
-            # guardo datos de depuración
-            if self.client:
-                self.XmlRequest = self.client.xml_request
-                self.XmlResponse = self.client.xml_response
-
-    return capturar_errores_wrapper
-
 
 class WebServiceAFIP:
     "Infraestructura basica para interfaces webservices de AFIP"
 
-    def __init__(self, reintentos=1):
+    def __init__(self, reintentos=1, produccion=False):
         self.reintentos = reintentos
-        self.xml = self.client = self.Log = None
-        self.params_in = {}
-        self.inicializar()
+        self.produccion = produccion
+        self.xml = self.client = None
         self.Token = self.Sign = ""
-        self.LanzarExcepciones = False
+        self.resetearOperacion()
 
-    def inicializar(self):
+
+    def resetearOperacion(self):
         self.Excepcion = self.Traceback = ""
         self.XmlRequest = self.XmlResponse = ""
 
@@ -193,7 +80,6 @@ class WebServiceAFIP:
                 proxy_dict = proxy
             else:
                 proxy_dict = parse_proxy(proxy)
-                self.log("Proxy Dict: %s" % str(proxy_dict))
             # deshabilitar verificación cert. servidor si es nulo falso vacio
             if not cacert:
                 cacert = None
@@ -204,10 +90,8 @@ class WebServiceAFIP:
                 pass
             else:
                 if not os.path.exists(cacert):
-                    self.log("Buscando CACERT en conf...")
                     cacert = os.path.join(self.InstallDir, "conf", os.path.basename(cacert))
                 if cacert and not os.path.exists(cacert):
-                    self.log("No se encuentra CACERT: %s" % str(cacert))
                     warnings.warn("No se encuentra CACERT: %s" % str(cacert))
                     cacert = None  # wrong version, certificates not found...
                     raise RuntimeError("Error de configuracion CACERT ver DebugLog")
@@ -231,38 +115,9 @@ class WebServiceAFIP:
                         location = location.replace("http://", "https://").replace(":80", ":443")
                         port['location'] = location
             return True
-        except:
-            ex = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
-            self.Traceback = ''.join(ex)
-            try:
-                self.Excepcion = traceback.format_exception_only(sys.exc_type, sys.exc_value)[0]
-            except:
-                self.Excepcion = u"<no disponible>"
-            if self.LanzarExcepciones:
-                raise
+        except Exception as e:
+            print e
             return False
-
-    def log(self, msg):
-        "Dejar mensaje en bitacora de depuración (método interno)"
-        if not isinstance(msg, unicode):
-            msg = unicode(msg, 'utf8', 'ignore')
-        if not self.Log:
-            self.Log = StringIO()
-        self.Log.write(msg)
-        self.Log.write('\n\r')
-        if DEBUG:
-            warnings.warn(msg)
-
-    def DebugLog(self):
-        "Devolver y limpiar la bitácora de depuración"
-        if self.Log:
-            msg = self.Log.getvalue()
-            # limpiar log
-            self.Log.close()
-            self.Log = None
-        else:
-            msg = u''
-        return msg
 
     @property
     def xml_request(self):
@@ -271,44 +126,6 @@ class WebServiceAFIP:
     @property
     def xml_response(self):
         return self.XmlResponse
-
-    def AnalizarXml(self, xml=""):
-        "Analiza un mensaje XML (por defecto el ticket de acceso)"
-        try:
-            if not xml or xml == 'XmlResponse':
-                xml = self.XmlResponse
-            elif xml == 'XmlRequest':
-                xml = self.XmlRequest
-            self.xml = SimpleXMLElement(xml)
-            return True
-        except Exception, e:
-            self.Excepcion = traceback.format_exception_only(sys.exc_type, sys.exc_value)[0]
-            return False
-
-    def ObtenerTagXml(self, *tags):
-        "Busca en el Xml analizado y devuelve el tag solicitado"
-        # convierto el xml a un objeto
-        try:
-            if self.xml:
-                xml = self.xml
-                # por cada tag, lo busco segun su nombre o posición
-                for tag in tags:
-                    xml = xml(tag)  # atajo a getitem y getattr
-                # vuelvo a convertir a string el objeto xml encontrado
-                return str(xml)
-        except Exception, e:
-            self.Excepcion = traceback.format_exception_only(sys.exc_type, sys.exc_value)[0]
-
-
-    def LeerError(self):
-        "Recorro los errores devueltos y devuelvo el primero si existe"
-
-        if self.Errores:
-            # extraigo el primer item
-            er = self.Errores.pop(0)
-            return er
-        else:
-            return ""
 
 
 class WebClient:

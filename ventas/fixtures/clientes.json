@@ -1,0 +1,11 @@
+[{
+  "model": "ventas.Cliente",
+  "pk": 1,
+  "fields": {
+    "razon_social": "Consumidor final sin identificar",
+    "cuit": "00-00000000-0",
+    "dni": "00000000",
+    "modificado_por_id": 1
+  }
+}]
+

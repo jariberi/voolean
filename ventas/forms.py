@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -52,6 +53,30 @@ class CondicionesVentaForm(MDLBaseModelForm):
 
 class ClientesForm(MDLBaseModelForm):
     formfield_callback = customize_field
+
+    def clean(self):
+        cd = super(ClientesForm, self).clean()
+        blank_dni = True if cd['dni'] == '' else False
+        cero_dni = False
+        if not blank_dni:
+            cero_dni = True if int(reduce(lambda x, y: int(x) + int(y), [l for l in cd['dni']])) == 0 else False
+        blank_cuit = True if cd['cuit'] == '' else False
+        cero_cuit = False
+        if not blank_cuit:
+            cero_cuit = True if int(
+                reduce(lambda x, y: int(x) + int(y), [l for l in cd['cuit'].replace("-", "")])) == 0 else False
+        if (blank_dni or cero_dni) and (blank_cuit or cero_cuit):
+            raise ValidationError('Debe ingresar el DNI o el CUIT')
+        else:
+            if not cero_dni and len(Cliente.objects.filter(dni=cd['dni'])) > 0 and not self.instance == Cliente.objects.get(dni=cd['dni']):
+                raise ValidationError('El DNI ingresado ya se encuentra cargado')
+            if not (cero_cuit or blank_cuit):
+                if len(Cliente.objects.filter(cuit=cd['cuit'])) > 0 and not self.instance == Cliente.objects.get(cuit=cd['cuit']):
+                    raise ValidationError('El CUIT ingresado ya se encuentra cargado')
+                if not re.match(r'\d{2}-\d{8}-\d{1}', cd['cuit']):
+                    raise ValidationError('CUIT incorrecto')
+        if cd['cond_iva'] == "RI" and (blank_cuit or cero_cuit):
+            raise ValidationError("Para un cliente Resposable Inscripto debe ingresar un CUIT")
 
     class Meta:
         model = Cliente

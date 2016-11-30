@@ -3,7 +3,7 @@ static_root/
 .idea/dataSources.local.xml
 .idea/dataSources/
 .idea/workspace.xml
-aaa.txt
+ventas/fixtures/aaa.json
 afip_ws/migrations/
 afip_ws/php.pyc
 afip_ws/soap.pyc
@@ -43,3 +43,4 @@ utils.pyc
 /cryp/cert-riberi-jorge.crt
 /voolean/personal.py
 /.idea/
+/ventas/fixtures/aaa.json
