@@ -27,7 +27,7 @@ from django.http.response import HttpResponseRedirect, HttpResponse, JsonRespons
 from django.forms.formsets import BaseFormSet, formset_factory
 
 from ventas.reports import IVAVentas
-from voolean.settings import USA_FACTURA_ELECTRONICA, ES_MONOTRIBUTO, CUIT
+from voolean.settings import USA_FACTURA_ELECTRONICA, ES_MONOTRIBUTO, CUIT, DEBUG
 
 
 class RubrosList(TemplateView):
@@ -631,12 +631,24 @@ def afip_aprob(request, pk):
     pv = str(utils.get_pto_vta(venta))
     cd = ch = utils.get_num_comp(venta)
     fec = venta.fecha.strftime('%Y%m%d')
-    ndo = venta.cliente.cuit.replace('-', '')
     imt = "%.2f" % venta.total
     imn = "%.2f" % venta.neto
     imi = "%.2f" % (venta.iva105 + venta.iva21 + venta.iva27)
-    fact = WSFEv1(produccion=True)
-    fact.CrearFactura(concepto=1, tipo_doc=80, nro_doc=ndo, tipo_cbte=tc,
+    fact = WSFEv1(produccion=not DEBUG)##Ruso:: Crear settoeken, sign, y cuit
+    if venta.cliente.cuit:
+        if venta.cliente.cuit == '00-00000000-0':
+            tdoc = 99
+            ndo = 0
+        else:
+            tdoc = 80
+            ndo = venta.cliente.cuit.replace('-', '')
+    elif venta.cliente.dni:
+        tdoc = 96
+        ndo = venta.cliente.dni
+    else:
+        tdoc = 99
+        ndo = 0
+    fact.CrearFactura(concepto=1, tipo_doc=tdoc, nro_doc=ndo, tipo_cbte=tc,
                       punto_vta=pv, cbt_desde=cd, cbt_hasta=ch, imp_total=imt,
                       imp_tot_conc=0.00, imp_neto=imn, imp_iva=imi,
                       fecha_cbte=fec, fecha_venc_pago="", fecha_serv_hasta=None,
@@ -678,7 +690,7 @@ def afip_aprob(request, pk):
                              'cae': cae,
                              'venc': venta.fvto_cae})
     else:
-        err = fact.ErrMsg
+        err = fact.Errores
         obs = fact.Observaciones
         return JsonResponse({'result': 'ER',
                              'obs': obs,
