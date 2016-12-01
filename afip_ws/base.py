@@ -102,8 +102,7 @@ class WebServiceAFIP:
             proxy=proxy_dict,
             cacert=cacert,
             timeout=timeout,
-            ns=None, soap_server=soap_server,
-            trace="--trace" in sys.argv)
+            ns=None, trace="--trace" in sys.argv)
         self.wsdl = wsdl  # utilizado por TrazaMed (para corregir el location)
         # corrijo ubicación del servidor (puerto http 80 en el WSDL AFIP)
         for service in self.client.services.values():
