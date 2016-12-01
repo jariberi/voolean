@@ -658,11 +658,11 @@ def afip_aprob(request, pk):
     iv105 = "%.2f" % venta.iva105
     iva27 = "%.2f" % venta.iva27
     if venta.iva105 > Decimal("0"):
-        fact.agregarIva(4, round(venta.iva105 / Decimal("0.105"), 2), venta.iva105)
+        fact.AgregarIva(4, round(venta.iva105 / Decimal("0.105"), 2), venta.iva105)
     if venta.iva21 > Decimal("0"):
-        fact.agregarIva(5, round(venta.iva21 / Decimal("0.21"), 2), venta.iva21)
+        fact.AgregarIva(5, round(venta.iva21 / Decimal("0.21"), 2), venta.iva21)
     if venta.iva27 > Decimal("0"):
-        fact.agregarIva(6, round(venta.iva27 / Decimal("0.27"), 2), venta.iva27)
+        fact.AgregarIva(6, round(venta.iva27 / Decimal("0.27"), 2), venta.iva27)
     # fact.SetParametros(cuit="20149443984", token=token, sign=sign)
     # Asociar comprobantes!! 
     # if venta.comprobante_relacionado:
