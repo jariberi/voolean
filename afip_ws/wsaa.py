@@ -159,8 +159,8 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
                 return wsaa
             else:
                 return None
-        except Exception as e:
-            raise e
+        except Exception:
+            raise
             return None
     if permiso.expiration > now():
         wsaa = WSAA()
@@ -182,6 +182,6 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
                 return wsaa
             else:
                 return None
-        except Exception as e:
-            raise e
+        except Exception:
+            raise
             return None

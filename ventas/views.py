@@ -688,7 +688,7 @@ def afip_aprob(request, pk):
                              'obs': obs,
                              'err': None,
                              'cae': cae,
-                             'venc': venta.fvto_cae})
+                             'venc': venta.fvto_cae.strftime("%d/%m/%Y")})
     else:
         err = fact.Errores
         obs = fact.Observaciones

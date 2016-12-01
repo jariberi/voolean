@@ -6,7 +6,6 @@ __author__ = "Jorge Riberi <jariberi@gmail.com>"
 import sys
 import os
 import stat
-import traceback
 import warnings
 from cStringIO import StringIO
 from urllib import urlencode
