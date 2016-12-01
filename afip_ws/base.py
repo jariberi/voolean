@@ -1,5 +1,5 @@
 # -*- coding: utf8 -*-
-from afip_ws.soap import SoapClient
+from afip_ws import soap
 
 __author__ = "Jorge Riberi <jariberi@gmail.com>"
 
@@ -97,7 +97,7 @@ class WebServiceAFIP:
                 return False
         # analizar espacio de nombres (axis vs .net):
         # ns = 'ser' if self.WSDL[-5:] == "?wsdl" else None
-        self.client = SoapClient(
+        self.client = soap.SoapClient(
             wsdl=wsdl,
             proxy=proxy_dict,
             cacert=cacert,
