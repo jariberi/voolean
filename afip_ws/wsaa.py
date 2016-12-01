@@ -159,8 +159,8 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
                 return wsaa
             else:
                 return None
-        except e:
-            print e
+        except Exception as e:
+            raise e
             return None
     if permiso.expiration > now():
         wsaa = WSAA()
@@ -170,7 +170,8 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
     else:
         wsaa = WSAA()
         tra = wsaa.CreateTRA(ttl=ttl, service=servicio)
-        cms = wsaa.SignTRA(tra, cert=CERT_FILE_TEST, privatekey=PRIVATE_KEY_FILE)
+        cert = CERT_FILE_PROD if produccion else CERT_FILE_TEST
+        cms = wsaa.SignTRA(tra, cert=cert, privatekey=PRIVATE_KEY_FILE)
         try:
             if wsaa.Conectar():
                 wsaa.LoginCMS(cms)
@@ -181,5 +182,6 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
                 return wsaa
             else:
                 return None
-        except:
+        except Exception as e:
+            raise e
             return None
