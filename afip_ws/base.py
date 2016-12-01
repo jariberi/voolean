@@ -70,53 +70,50 @@ class WebServiceAFIP:
 
     def Conectar(self, wsdl=None, proxy="", wrapper=None, cacert=None, timeout=30, soap_server=None):
         "Conectar cliente soap del web service"
-        try:
-            # analizar transporte y servidor proxy:
-            if wrapper:
-                Http = set_http_wrapper(wrapper)
-                self.Version = self.Version + " " + Http._wrapper_version
-            if isinstance(proxy, dict):
-                proxy_dict = proxy
-            else:
-                proxy_dict = parse_proxy(proxy)
-            # deshabilitar verificación cert. servidor si es nulo falso vacio
-            if not cacert:
-                cacert = None
-            elif cacert is True:
-                # usar certificados predeterminados que vienen en la biblioteca
-                cacert = os.path.join(httplib2.__path__[0], 'cacerts.txt')
-            elif cacert.startswith("-----BEGIN CERTIFICATE-----"):
-                pass
-            else:
-                if not os.path.exists(cacert):
-                    cacert = os.path.join(self.InstallDir, "conf", os.path.basename(cacert))
-                if cacert and not os.path.exists(cacert):
-                    warnings.warn("No se encuentra CACERT: %s" % str(cacert))
-                    cacert = None  # wrong version, certificates not found...
-                    raise RuntimeError("Error de configuracion CACERT ver DebugLog")
-                    return False
-            # analizar espacio de nombres (axis vs .net):
-            # ns = 'ser' if self.WSDL[-5:] == "?wsdl" else None
-            self.client = SoapClient(
-                wsdl=wsdl,
-                proxy=proxy_dict,
-                cacert=cacert,
-                timeout=timeout,
-                ns=None, soap_server=soap_server,
-                trace="--trace" in sys.argv)
-            self.wsdl = wsdl  # utilizado por TrazaMed (para corregir el location)
-            # corrijo ubicación del servidor (puerto http 80 en el WSDL AFIP)
-            for service in self.client.services.values():
-                for port in service['ports'].values():
-                    location = port['location']
-                    if location and location.startswith("http://"):
-                        warnings.warn("Corrigiendo WSDL ... %s" % location)
-                        location = location.replace("http://", "https://").replace(":80", ":443")
-                        port['location'] = location
-            return True
-        except Exception as e:
-            print e
-            return False
+
+        # analizar transporte y servidor proxy:
+        if wrapper:
+            Http = set_http_wrapper(wrapper)
+            self.Version = self.Version + " " + Http._wrapper_version
+        if isinstance(proxy, dict):
+            proxy_dict = proxy
+        else:
+            proxy_dict = parse_proxy(proxy)
+        # deshabilitar verificación cert. servidor si es nulo falso vacio
+        if not cacert:
+            cacert = None
+        elif cacert is True:
+            # usar certificados predeterminados que vienen en la biblioteca
+            cacert = os.path.join(httplib2.__path__[0], 'cacerts.txt')
+        elif cacert.startswith("-----BEGIN CERTIFICATE-----"):
+            pass
+        else:
+            if not os.path.exists(cacert):
+                cacert = os.path.join(self.InstallDir, "conf", os.path.basename(cacert))
+            if cacert and not os.path.exists(cacert):
+                warnings.warn("No se encuentra CACERT: %s" % str(cacert))
+                cacert = None  # wrong version, certificates not found...
+                raise RuntimeError("Error de configuracion CACERT ver DebugLog")
+                return False
+        # analizar espacio de nombres (axis vs .net):
+        # ns = 'ser' if self.WSDL[-5:] == "?wsdl" else None
+        self.client = SoapClient(
+            wsdl=wsdl,
+            proxy=proxy_dict,
+            cacert=cacert,
+            timeout=timeout,
+            ns=None, soap_server=soap_server,
+            trace="--trace" in sys.argv)
+        self.wsdl = wsdl  # utilizado por TrazaMed (para corregir el location)
+        # corrijo ubicación del servidor (puerto http 80 en el WSDL AFIP)
+        for service in self.client.services.values():
+            for port in service['ports'].values():
+                location = port['location']
+                if location and location.startswith("http://"):
+                    warnings.warn("Corrigiendo WSDL ... %s" % location)
+                    location = location.replace("http://", "https://").replace(":80", ":443")
+                    port['location'] = location
+        return True
 
     @property
     def xml_request(self):
