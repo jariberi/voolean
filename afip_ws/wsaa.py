@@ -168,7 +168,7 @@ def obtener_o_crear_permiso(ttl=120, servicio="wsfe", produccion=False):##Ruso: 
         wsaa.Token = permiso.token
         return wsaa
     else:
-        wsaa = WSAA()
+        wsaa = WSAA(produccion=produccion)
         tra = wsaa.CreateTRA(ttl=ttl, service=servicio)
         cert = CERT_FILE_PROD if produccion else CERT_FILE_TEST
         cms = wsaa.SignTRA(tra, cert=cert, privatekey=PRIVATE_KEY_FILE)
