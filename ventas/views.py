@@ -691,9 +691,8 @@ def afip_aprob(request, pk):
                              'venc': venta.fvto_cae.strftime("%d/%m/%Y")})
     else:
         err = fact.Errores
-        obs = fact.Observaciones
         return JsonResponse({'result': 'ER',
-                             'obs': obs,
+                             'obs': None,
                              'err': err,
                              'cae': None,
                              'venc': None})
