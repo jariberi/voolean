@@ -141,7 +141,7 @@ class WSAA(WebServiceAFIP):
         logger.info("Obteniendo ticket de permiso")
         try:
             xml=et.fromstring(self.client.service.loginCms(in0=str(cms)))
-            logger.info("Respuesta: " + xml.tostring())
+            logger.info("Respuesta: " + et.tostring(xml))
             self.Token = xml[1][0].text
             self.Sign = xml[1][1].text
             self.ExpirationTime = xml[0][4].text
