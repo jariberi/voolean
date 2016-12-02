@@ -179,7 +179,7 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
-        'boolean_app': {
+        'voolean': {
             'handlers': ['file'],
             'level': 'DEBUG',
             'propagate': True
