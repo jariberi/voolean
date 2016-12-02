@@ -106,13 +106,8 @@ class WSFEv1(WebServiceAFIP):
     def AgregarIva(self, iva_id=0, base_imp=0.0, importe=0.0):
         "Agrego un tributo a una factura (interna)"
         logger.info("Intentando agregar IVA:\n%s, %s, %s" % (iva_id, base_imp, importe))
-        try:
-            iva = {'iva_id': iva_id, 'base_imp': base_imp, 'importe': importe}
-            self.factura['iva'].append(iva)
-            logger.info("Iva agregado:\n%s" % iva)
-        except Exception, e:
-            logger.info(e)
-            raise
+        iva = {'iva_id': iva_id, 'base_imp': base_imp, 'importe': importe}
+        self.factura['iva'].append(iva)
         return True
 
     def AgregarOpcional(self, opcional_id=0, valor=""):
@@ -191,11 +186,11 @@ class WSFEv1(WebServiceAFIP):
 
         if "FeDetResp" in FECAEResponse:
             self.Resultado = FECAEResponse.FeDetResp.FECAEDetResponse[0].Resultado
-            self.CAE =FECAEResponse.FeDetResp.FECAEDetResponse[0].CAE
-            self.Vencimiento = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAEFchVto
             if self.Resultado == 'R':
                 logger.info("Factura rechazada")
             elif self.Resultado == 'A':
+                self.CAE = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAE
+                self.Vencimiento = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAEFchVto
                 logger.info("Factura aprobada")
 
             if 'Observaciones' in FECAEResponse.FeDetResp.FECAEDetResponse[0]:
