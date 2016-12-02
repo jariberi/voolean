@@ -105,9 +105,14 @@ class WSFEv1(WebServiceAFIP):
 
     def AgregarIva(self, iva_id=0, base_imp=0.0, importe=0.0):
         "Agrego un tributo a una factura (interna)"
-        iva = {'iva_id': iva_id, 'base_imp': base_imp, 'importe': importe}
-        self.factura['iva'].append(iva)
-        logger.info("Iva agregado:\n%s" % iva)
+        logger.info("Intentando agregar IVA:\n%s, %s, %s" % (iva_id, base_imp, importe))
+        try:
+            iva = {'iva_id': iva_id, 'base_imp': base_imp, 'importe': importe}
+            self.factura['iva'].append(iva)
+            logger.info("Iva agregado:\n%s" % iva)
+        except Exception, e:
+            logger.info(e)
+            raise
         return True
 
     def AgregarOpcional(self, opcional_id=0, valor=""):
