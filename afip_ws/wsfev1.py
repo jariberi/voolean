@@ -184,21 +184,6 @@ class WSFEv1(WebServiceAFIP):
 
         logger.info("Respuesta desde AFIP:\n%s" % FECAEResponse)
 
-        if "FeDetResp" in FECAEResponse:
-            self.Resultado = FECAEResponse.FeDetResp.FECAEDetResponse[0].Resultado
-            if self.Resultado == 'R':
-                logger.info("Factura rechazada")
-            elif self.Resultado == 'A':
-                self.CAE = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAE
-                self.Vencimiento = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAEFchVto
-                logger.info("Factura aprobada")
-
-            if 'Observaciones' in FECAEResponse.FeDetResp.FECAEDetResponse[0]:
-                logger.info("Observaciones:\n")
-                for obs in FECAEResponse.FeDetResp.FECAEDetResponse[0].Observaciones.Obs:
-                    obser = {'code': obs.Code, 'msg': obs.Msg.encode('latin-1')}
-                    logger.info(str(obser))
-                    self.Observaciones.append(obser)
 
         if "Errors" in FECAEResponse:
             logger.info("Errores:\n")
@@ -208,7 +193,25 @@ class WSFEv1(WebServiceAFIP):
                 self.Errores.append(err)
             return False
 
-        return True
+        if "FeDetResp" in FECAEResponse:
+            self.Resultado = FECAEResponse.FeDetResp.FECAEDetResponse[0].Resultado
+
+            if 'Observaciones' in FECAEResponse.FeDetResp.FECAEDetResponse[0]:
+                logger.info("Observaciones:\n")
+                for obs in FECAEResponse.FeDetResp.FECAEDetResponse[0].Observaciones.Obs:
+                    obser = {'code': obs.Code, 'msg': obs.Msg.encode('latin-1')}
+                    logger.info(str(obser))
+                    self.Observaciones.append(obser)
+
+            if self.Resultado == 'A':
+                self.CAE = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAE
+                self.Vencimiento = FECAEResponse.FeDetResp.FECAEDetResponse[0].CAEFchVto
+                logger.info("Factura aprobada")
+                return True
+            elif self.Resultado == 'R':
+                logger.info("Factura Rechazada")
+
+
 
     def CompTotXRequest(self):
         ret = self.client.FECompTotXRequest(

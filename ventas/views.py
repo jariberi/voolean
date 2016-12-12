@@ -410,7 +410,11 @@ def vender(request):
                 factura.numero = utils.get_num_comp(factura)
                 factura.save()
             # return HttpResponseRedirect(reverse_lazy('nuevaVenta'))
-            data = {'pk': factura.pk, 'redirect': reverse('nuevaVenta')}
+            contado = Condicion_venta.objects.get(pk=1)
+            if factura.condicion_venta == contado:
+                data = {'pk': factura.pk, 'redirect': reverse('nuevoReciboContado', args=[factura.pk])}
+            else:
+                data = {'pk': factura.pk, 'redirect': reverse('nuevaVenta')}
             return JsonResponse(data)
 
     else:
@@ -683,18 +687,17 @@ def afip_aprob(request, pk):
         venta.cae = cae
         venta.fvto_cae = datetime.strptime(cae_venc, "%Y%m%d").date()
         venta.save()
-        obs = []
-        if fact.Observaciones:
-            obs = fact.Observaciones
+        obs = fact.Observaciones if fact.Observaciones else None
         return JsonResponse({'result': 'OK',
                              'obs': obs,
                              'err': None,
                              'cae': cae,
                              'venc': venta.fvto_cae.strftime("%d/%m/%Y")})
     else:
-        err = fact.Errores
+        obs = fact.Observaciones if fact.Observaciones else None
+        err = fact.Errores if fact.Errores else None
         return JsonResponse({'result': 'ER',
-                             'obs': None,
+                             'obs': obs,
                              'err': err,
                              'cae': None,
                              'venc': None})

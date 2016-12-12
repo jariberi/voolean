@@ -11,11 +11,11 @@
 }
 
 #detalle_factura .detalle-iva, #detalle_factura .detalle-linea {
-    width: 110px;
+    width: 60px;
 }
 
 #detalle_factura .detalle-descripcion {
-    width: calc(100% - 220px);
+    width: calc(100% - 120px);
 }
 
 #importe_subtotal::before, #importe_neto::before, #importe_iva::before, #importe_total::before {

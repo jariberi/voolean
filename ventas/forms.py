@@ -68,7 +68,7 @@ class ClientesForm(MDLBaseModelForm):
         if (blank_dni or cero_dni) and (blank_cuit or cero_cuit):
             raise ValidationError('Debe ingresar el DNI o el CUIT')
         else:
-            if not cero_dni and len(Cliente.objects.filter(dni=cd['dni'])) > 0 and not self.instance == Cliente.objects.get(dni=cd['dni']):
+            if not blank_dni and not cero_dni and len(Cliente.objects.filter(dni=cd['dni'])) > 0 and not self.instance == Cliente.objects.get(dni=cd['dni']):
                 raise ValidationError('El DNI ingresado ya se encuentra cargado')
             if not (cero_cuit or blank_cuit):
                 if len(Cliente.objects.filter(cuit=cd['cuit'])) > 0 and not self.instance == Cliente.objects.get(cuit=cd['cuit']):

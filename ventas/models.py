@@ -236,6 +236,7 @@ class Cliente(BaseModel):
         ("RI", "Responsable Inscripto"),
         ("MO", "Monotributo"),
         ("CF", "Consumidor Final"),
+        ("EX", "Exento"),
     )
     razon_social = models.CharField(max_length=100, help_text="Razón social del cliente")
     direccion = models.CharField(max_length=100, help_text="Dirección del cliente", blank=True)
