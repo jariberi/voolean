@@ -363,6 +363,14 @@ class Venta(models.Model):
     def estado(self):
         return "Aprobado" if self.aprobado else "Borrador"
 
+    @property
+    def subtotal(self):
+        return self.subtotal21 + self.subtotal27 + self.subtotal105 + self.subtotalex
+
+    @property
+    def neto(self):
+        return self.neto21 + self.neto27 + self.neto105 + self.netoex
+
     def descuento_importe(self):
         return self.subtotal * self.descuento / Decimal(100)
 
