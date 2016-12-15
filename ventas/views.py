@@ -335,26 +335,33 @@ def vender(request):
                                                                articulo=compuesto.cleaned_data[
                                                                    'articulo_almacenado'])
                             item_c.save()
-            subtotal = neto = Decimal("0")
             iva = {'IVA00': Decimal("0"), 'IV105': Decimal("0"), 'IVA21': Decimal("0"), 'IVA27': Decimal("0")}
+            neto = {'IVA00': Decimal("0"), 'IV105': Decimal("0"), 'IVA21': Decimal("0"), 'IVA27': Decimal("0")}
+            subtotal = {'IVA00': Decimal("0"), 'IV105': Decimal("0"), 'IVA21': Decimal("0"), 'IVA27': Decimal("0")}
             for item_a in factura.almacenado_venta.all():
-                subtotal += item_a.subtotal()
-                neto += item_a.neto()
+                subtotal[item_a.articulo.iva] += item_a.subtotal()
+                neto[item_a.articulo.iva] += item_a.neto()
                 iva[item_a.articulo.iva] += item_a.iva_value()
             for item_p in factura.personalizado_venta.all():
-                subtotal += item_p.subtotal()
-                neto += item_p.neto()
+                subtotal[item_p.iva] += item_p.subtotal()
+                neto[item_p.iva] += item_p.neto()
                 iva[item_p.iva] += item_p.iva_value()
             for item_c in factura.compuesto_venta.all():
-                subtotal += item_c.subtotal()
-                neto += item_c.neto()
+                subtotal[item_c.iva] += item_c.subtotal()
+                neto[item_c.iva] += item_c.neto()
                 iva[item_c.iva] += item_c.iva_value()
-            factura.subtotal = subtotal - (subtotal * factura.descuento / Decimal(100))
-            factura.neto = neto - (neto * factura.descuento / Decimal(100))
+            factura.subtotalex = subtotal['IVA00'] - (subtotal['IVA00'] * factura.descuento / Decimal(100))
+            factura.subtotal21 = subtotal['IVA21'] - (subtotal['IVA21'] * factura.descuento / Decimal(100))
+            factura.subtotal105 = subtotal['IV105'] - (subtotal['IV105'] * factura.descuento / Decimal(100))
+            factura.subtotal27 = subtotal['IVA27'] - (subtotal['IVA27'] * factura.descuento / Decimal(100))
+            factura.netoex = neto['IVA00'] - (neto['IVA00'] * factura.descuento / Decimal(100))
+            factura.neto21 = neto['IVA21'] - (neto['IVA21'] * factura.descuento / Decimal(100))
+            factura.neto105 = neto['IV105'] - (neto['IV105'] * factura.descuento / Decimal(100))
+            factura.neto27 = neto['IVA27'] - (neto['IVA27'] * factura.descuento / Decimal(100))
             factura.iva21 = iva['IVA21'] - (iva['IVA21'] * factura.descuento / Decimal(100))
             factura.iva27 = iva['IVA27'] - (iva['IVA27'] * factura.descuento / Decimal(100))
             factura.iva105 = iva['IV105'] - (iva['IV105'] * factura.descuento / Decimal(100))
-            factura.total = factura.saldo = factura.neto + factura.iva21 + factura.iva105 + factura.iva27
+            factura.total = factura.saldo = factura.netoex +factura.neto21 + factura.neto105 + factura.neto27 + factura.iva21 + factura.iva105 + factura.iva27
             factura.save()
             if factura.tipo.startswith("FA") or factura.tipo.startswith("ND"):
                 saldo_temp = factura.saldo
@@ -638,7 +645,7 @@ def afip_aprob(request, pk):
     cd = ch = utils.get_num_comp(venta)
     fec = venta.fecha.strftime('%Y%m%d')
     imt = "%.2f" % venta.total
-    imn = "%.2f" % venta.neto
+    imn = "%.2f" % (venta.neto21 + venta.neto27 + venta.neto105)
     imi = "%.2f" % (venta.iva105 + venta.iva21 + venta.iva27)
     fact = WSFEv1(produccion=not DEBUG)##Ruso:: Crear settoeken, sign, y cuit
     if venta.cliente.cuit:
@@ -659,16 +666,12 @@ def afip_aprob(request, pk):
                       imp_tot_conc=0.00, imp_neto=imn, imp_iva=imi,
                       fecha_cbte=fec, fecha_venc_pago="", fecha_serv_hasta=None,
                       moneda_id="PES", moneda_ctz="1.0000")
-    codigo_iva = {'IVA00': 3, 'IV105': 4, 'IVA21': 5, 'IVA27': 6}
-    iva21 = "%.2f" % venta.iva21
-    iv105 = "%.2f" % venta.iva105
-    iva27 = "%.2f" % venta.iva27
     if venta.iva105 > Decimal("0"):
-        fact.AgregarIva(4, round(venta.iva105 / Decimal("0.105"), 2), venta.iva105)
+        fact.AgregarIva(4, venta.neto105, venta.iva105)
     if venta.iva21 > Decimal("0"):
-        fact.AgregarIva(5, round(venta.iva21 / Decimal("0.21"), 2), venta.iva21)
+        fact.AgregarIva(5, venta.neto21, venta.iva21)
     if venta.iva27 > Decimal("0"):
-        fact.AgregarIva(6, round(venta.iva27 / Decimal("0.27"),2 ), venta.iva27)
+        fact.AgregarIva(6, venta.neto27, venta.iva27)
     # fact.SetParametros(cuit="20149443984", token=token, sign=sign)
     # Asociar comprobantes!! 
     # if venta.comprobante_relacionado:
