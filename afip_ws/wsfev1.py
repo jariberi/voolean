@@ -222,7 +222,7 @@ class WSFEv1(WebServiceAFIP):
         return result['RegXReq']
 
     def CompUltimoAutorizado(self, tipo_cbte, punto_vta):
-        ret = self.client.FECompUltimoAutorizado(
+        ret = self.client.service.FECompUltimoAutorizado(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
             PtoVta=punto_vta,
             CbteTipo=tipo_cbte,
@@ -230,11 +230,10 @@ class WSFEv1(WebServiceAFIP):
 
         result = ret['FECompUltimoAutorizadoResult']
         self.CbteNro = result['CbteNro']
-        self.__analizar_errores(result)
         return self.CbteNro is not None and str(self.CbteNro) or ''
 
     def CompConsultar(self, tipo_cbte, punto_vta, cbte_nro):
-        ret = self.client.FECompConsultar(
+        ret = self.client.service.FECompConsultar(
             Auth={'Token': self.Token, 'Sign': self.Sign, 'Cuit': self.Cuit},
             FeCompConsReq={
                 'CbteTipo': tipo_cbte,
