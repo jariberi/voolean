@@ -14,7 +14,7 @@ from core.models import Dinero
 from core.utils import to_word
 from ventas.models import Recibo, Venta, Item_almacenados, Item_personalizados, Item_compuesto
 from voolean.settings import RAZON_SOCIAL_EMPRESA, CUIT, DOMICILIO_COMERCIAL, INGRESOS_BRUTOS, INICIO_ACTIVIDADES, \
-    CIUDAD, PROVINCIA, CONDICION_IVA
+    CIUDAD, PROVINCIA, CONDICION_IVA, NOMBRE_FANTASIA
 from geraldo.graphics import Line, RoundRect
 from reportlab.lib.colors import yellow, grey, black
 
@@ -294,7 +294,7 @@ def obtener_comprobante(request, pk):
         p.drawCentredString(10.5 * cm, ycm(2.6) * cm, venta.tipo[-1:])
         # Recuadro izquierda
         p.setFont('Helvetica-Bold', 16)
-        rz_split = RAZON_SOCIAL_EMPRESA.split(" ")
+        rz_split = NOMBRE_FANTASIA.split(" ")
         pal_sum = 0
         linea_1 = linea_2 = ""
         for pal in rz_split:
@@ -306,7 +306,8 @@ def obtener_comprobante(request, pk):
         p.drawCentredString(5 * cm, ycm(2.5) * cm, linea_1[:-1])
         p.drawCentredString(5 * cm, ycm(3) * cm, linea_2[:-1])
         p.setFont('Helvetica', 11)
-        p.drawString(0.9 * cm, ycm(4.5) * cm, DOMICILIO_COMERCIAL + " - " + CIUDAD + ", " + PROVINCIA)
+        p.drawString(0.9 * cm, ycm(4.2) * cm, RAZON_SOCIAL_EMPRESA)
+        p.drawString(0.9 * cm, ycm(4.7) * cm, DOMICILIO_COMERCIAL + " - " + CIUDAD + ", " + PROVINCIA)
         p.drawCentredString(5.4 * cm, ycm(5.5) * cm, CONDICION_IVA)
         # Recuadro derecha
         p.setFont('Helvetica-Bold', 16)
